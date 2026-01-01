@@ -34,14 +34,7 @@ ansible-playbook website.yml -i "SERVER_IP," -u wordsail \
 | **libs**       | Reusable tasks: add_domain, remove_domain, issue_ssl                                          |
 | **operations** | Server ops: delete_site                                                                       |
 
-## Operations Tasks
-
-```bash
-
-# Delete a site (removes everything)
-ansible-playbook roles/operations/tasks/delete_site.yml -i "IP," -u wordsail \
-  --extra-vars "system_name=examplecom site_domain=example.com db_host=localhost"
-```
+xw
 
 ## Domain Management
 
@@ -91,7 +84,6 @@ After provisioning, servers have:
 └── example.com/
     ├── public/            # WordPress files
     ├── logs/              # Site logs
-    └── .env               # Database credentials
 
 /etc/nginx/sites-available/example.com/
 ├── example.com            # Main config
