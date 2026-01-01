@@ -1,0 +1,41 @@
+---
+- name: Assert required variables are defined
+  ansible.builtin.assert:
+    that:
+      - domain is defined and domain != ""
+      - system_name is defined and system_name != ""
+    fail_msg: "Required variables missing: domain and system_name must be provided for add_domain operation"
+    success_msg: "All required variables are properly defined"
+  tags: add_domain
+
+- name: Create site directory structure
+  ansible.builtin.file:
+    path: "/etc/nginx/sites-available/{{ domain }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - ""
+    - after
+    - before
+    - location
+    - server
+  tags: add_domain
+
+- name: Deploy main site config
+  ansible.builtin.template:
+    src: site.conf.j2
+    dest: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
+    owner: root
+    group: root
+    mode: "0644"
+  tags: add_domain
+
+- name: Symlink site to sites-enabled
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
+    dest: /etc/nginx/sites-enabled/{{ domain }}
+    state: link
+  tags: add_domain
+  notify: Reload nginx

@@ -1,0 +1,12 @@
+---
+# WordSail Ansible - Global Variables
+# See inventory/group_vars/all.yml.example for documentation
+
+ansible_managed: "Managed by WordSail"
+mysql_root_password: "{{ lookup('password', '/dev/null length=24 chars=ascii_letters,digits') }}"
+
+# REQUIRED: Set these variables before running playbooks
+# You can set them here or pass via --extra-vars
+certbot_email: "{{ certbot_email | default('') }}"
+mysql_wordsailbot_password: "{{ mysql_wordsailbot_password | default('') }}"
+wordsail_ssh_key: "{{ wordsail_ssh_key | default('') }}"

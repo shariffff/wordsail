@@ -1,0 +1,11 @@
+---
+- name: Configure WordPress Hosting Server
+  hosts: all:!localhost
+  become: true
+  gather_facts: true
+  roles:
+    - { role: bootstrap, tags: "bootstrap" }
+    - { role: database, tags: "database" }
+    - { role: nginx, tags: "nginx" }
+    - { role: php, tags: "php" }
+    - { role: security, tags: "security" }

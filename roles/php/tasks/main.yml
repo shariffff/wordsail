@@ -1,0 +1,95 @@
+---
+- name: "PHP add repository"
+  ansible.builtin.apt_repository:
+    repo: ppa:ondrej/php
+    state: present
+  register: add_repository
+
+- name: Install PHP 8.3 and extensions
+  ansible.builtin.apt:
+    name:
+      - php8.3-bcmath
+      - php8.3-cli
+      - php8.3-common
+      - php8.3-curl
+      - php8.3-gd
+      - php8.3-igbinary
+      - php8.3-imagick
+      - php8.3-intl
+      - php8.3-mbstring
+      - php8.3-mysql
+      - php8.3-opcache
+      - php8.3-redis
+      - php8.3-soap
+      - php8.3-xml
+      - php8.3-zip
+      - php8.3-fpm
+      - libpcre2-8-0
+    state: present
+    update_cache: "{{ add_repository.changed }}"
+  notify: restart php-fpm
+
+- name: Configure PHP upload limits
+  ansible.builtin.lineinfile:
+    path: /etc/php/8.3/fpm/php.ini
+    regexp: "^upload_max_filesize"
+    line: "upload_max_filesize = 64M"
+    state: present
+  notify: restart php-fpm
+
+- name: Configure PHP post size
+  ansible.builtin.lineinfile:
+    path: /etc/php/8.3/fpm/php.ini
+    regexp: "^post_max_size"
+    line: "post_max_size = 64M"
+    state: present
+  notify: restart php-fpm
+
+- name: Configure PHP disabled functions
+  ansible.builtin.lineinfile:
+    path: /etc/php/8.3/fpm/php.ini
+    regexp: "^;?disable_functions"
+    line: "disable_functions = disk_free_space,disk_total_space,diskfreespace,dl,exec,opcache_get_configuration,opcache_get_status,passthru,pclose,pcntl_alarm,pcntl_exec,pcntl_fork,pcntl_get_last_error,pcntl_getpriority,pcntl_setpriority,pcntl_signal,pcntl_signal_dispatch,pcntl_sigprocmask,pcntl_sigtimedwait,pcntl_sigwaitinfo,pcntl_strerror,pcntl_waitpid,pcntl_wait,pcntl_wexitstatus,pcntl_wifcontinued,pcntl_wifexited,pcntl_wifsignaled,pcntl_wifstopped,pcntl_wstopsig,pcntl_wtermsig,popen,posix_getpwuid,posix_kill,posix_mkfifo,posix_setpgid,posix_setsid,posix_setuid,posix_uname,proc_close,proc_get_status,proc_nice,proc_open,proc_terminate,shell_exec,show_source,system"
+    state: present
+  notify: restart php-fpm
+
+- name: Configure PHP-FPM process manager
+  ansible.builtin.lineinfile:
+    path: /etc/php/8.3/fpm/pool.d/www.conf
+    regexp: "^pm ="
+    line: "pm = ondemand"
+    state: present
+  notify: restart php-fpm
+
+- name: Configure ImageMagick policy
+  ansible.builtin.lineinfile:
+    path: /etc/ImageMagick-6/policy.xml
+    regexp: '<policy\s+domain="coder"\s+rights="none"\s+pattern="PDF"\s+/>'
+    line: '  <policy domain="coder" rights="read|write" pattern="PDF" />'
+    state: present
+    backrefs: true
+
+- name: Install Composer
+  ansible.builtin.get_url:
+    url: https://getcomposer.org/installer
+    dest: /tmp/composer-installer.php
+    mode: "0755"
+
+- name: Run Composer installer
+  ansible.builtin.command: php /tmp/composer-installer.php --install-dir=/tmp --filename=composer.phar
+  args:
+    chdir: /tmp
+    creates: /tmp/composer.phar
+
+- name: Move Composer to global location
+  ansible.builtin.copy:
+    src: /tmp/composer.phar
+    dest: /usr/local/bin/composer
+    mode: "0755"
+    remote_src: true
+
+- name: Install WP-CLI
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+    dest: /usr/local/bin/wp
+    mode: "0755"

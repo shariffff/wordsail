@@ -1,0 +1,36 @@
+---
+- name: Ensure PHP 8.3 is installed
+  apt:
+    name: php8.3-fpm
+    state: present
+  become: true
+
+- name: Ensure PHP-FPM pool config for site
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - { src: "pool.conf.j2", dest: "/etc/php/8.3/fpm/pool.d/{{ system_name }}.conf" }
+    - { src: "wordsail-pool.conf.j2", dest: "{{ site_home }}/.wordsail-pool.conf" }
+  notify: Reload php-fpm
+
+- name: Set ACL for PHP-FPM pool config
+  acl:
+    path: /etc/php/8.3/fpm/pool.d/site.conf
+    entity: "{{ site_group }}"
+    etype: group
+    permissions: "---"
+    state: present
+    follow: true
+  ignore_errors: true
+
+- name: Ensure /cache/{{ domain }} exists
+  file:
+    path: "/cache/{{ domain }}"
+    state: directory
+    owner: www-data
+    group: www-data
+    mode: "0700"

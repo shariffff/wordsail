@@ -1,0 +1,174 @@
+---
+- name: Assert required variables are defined
+  ansible.builtin.assert:
+    that:
+      - domain is defined and domain != ""
+    fail_msg: "Required variable missing: domain must be provided for issue_ssl operation"
+    success_msg: "Required domain variable is properly defined"
+  tags: issue_ssl
+
+- name: Check if well-known.conf exists
+  ansible.builtin.stat:
+    path: /etc/nginx/global/well-known.conf
+    get_checksum: true
+    checksum_algorithm: sha1
+    get_mime: true
+    get_attributes: true
+    follow: false
+  register: well_known_stat
+  tags: issue_ssl
+
+- name: Copy well-known.conf to Nginx global directory
+  ansible.builtin.copy:
+    src: well-known.conf.j2
+    dest: /etc/nginx/global/well-known.conf
+    force: true
+    backup: false
+  when: not well_known_stat.stat.exists
+  tags: issue_ssl
+
+- name: Create symbolic link for well-known.conf
+  ansible.builtin.file:
+    src: /etc/nginx/global/well-known.conf
+    dest: /etc/nginx/sites-available/{{ domain }}/server/well-known.conf
+    state: link
+    follow: true
+  tags: issue_ssl
+
+- name: Gather service facts for systemd tasks
+  ansible.builtin.setup:
+    gather_subset: ["!all"]
+    filter: ["ansible_service_mgr"]
+    gather_timeout: 10
+    fact_path: /etc/ansible/facts.d
+  tags: issue_ssl
+
+- name: Reload Nginx service
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+    scope: system
+  tags: issue_ssl
+
+- name: Create directory for Certbot webroot
+  ansible.builtin.command:
+    cmd: mkdir -p /sites/.certbot
+    creates: /sites/.certbot
+  tags: issue_ssl
+
+- name: Run Certbot to obtain SSL certificate
+  ansible.builtin.command:
+    cmd: certbot certonly --webroot --cert-name {{ domain }} --webroot-path /sites/.certbot -d {{ domain }} --preferred-challenges http --noninteractive
+      --agree-tos --email {{ certbot_email }}
+    creates: /etc/letsencrypt/live/{{ domain }}
+  tags: issue_ssl
+
+- name: Create temporary Nginx directory
+  ansible.builtin.command:
+    cmd: mkdir -p /tmp/nginx
+    creates: /tmp/nginx
+  tags: issue_ssl
+
+- name: Copy Nginx site configuration to temporary directory
+  ansible.builtin.command:
+    cmd: cp -R /etc/nginx/sites-available/{{ domain }} /tmp/nginx/ssl-backup-{{ domain }}
+    creates: /tmp/nginx/ssl-backup-{{ domain }}
+  tags: issue_ssl
+
+- name: Update Nginx listen directive to SSL for port 80
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
+    regexp: "^\\s*listen\\s+80;\\s+#\\s+Ansible managed"
+    line: "  listen 443 ssl; # Ansible managed"
+    state: present
+    backrefs: true
+  tags: issue_ssl
+
+- name: Update Nginx listen directive to SSL for IPv6
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
+    regexp: "^\\s*listen\\s+\\[\\:\\:\\]:80;\\s+#\\s+Ansible managed"
+    line: "  listen [::]:443 ssl; # Ansible managed\n  http2 on; # Ansible managed"
+    state: present
+    backrefs: true
+  tags: issue_ssl
+
+- name: Add SSL certificate path to Nginx configuration
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
+    regexp: "^[^\\S\\r\\n]#?\\s*ssl_certificate\\s+"
+    line: "  ssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem; # Ansible managed"
+    state: present
+    backrefs: true
+  tags: issue_ssl
+
+- name: Add SSL certificate key path to Nginx configuration
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
+    regexp: "^[^\\S\\r\\n]#?\\s*ssl_certificate_key\\s+"
+    line: "  ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem; # Ansible managed"
+    state: present
+    backrefs: true
+  tags: issue_ssl
+
+- name: Add Strict-Transport-Security header
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/global/https.conf
+    regexp: "add_header Strict-Transport-Security"
+    line: 'add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;'
+    state: present
+  tags: issue_ssl
+
+- name: Create symbolic link for https.conf
+  ansible.builtin.file:
+    src: /etc/nginx/global/https.conf
+    dest: /etc/nginx/sites-available/{{ domain }}/server/https.conf
+    state: link
+    follow: true
+  tags: issue_ssl
+
+- name: Check if https-redirect.conf exists
+  ansible.builtin.stat:
+    path: /etc/nginx/sites-available/{{ domain }}/after/https-redirect.conf
+    get_checksum: true
+    checksum_algorithm: sha1
+    get_mime: true
+    get_attributes: true
+    follow: false
+  tags: issue_ssl
+
+- name: Copy https-redirect.conf to Nginx site directory
+  ansible.builtin.template:
+    src: https-redirect.conf.j2
+    dest: /etc/nginx/sites-available/{{ domain }}/after/https-redirect.conf
+    force: true
+    backup: false
+  tags: issue_ssl
+  notify: Reload nginx
+
+- name: Check if wordsail-redirects.conf exists
+  ansible.builtin.stat:
+    path: /etc/nginx/sites-available/{{ domain }}/before/wordsail-redirects.conf
+    get_checksum: true
+    checksum_algorithm: sha1
+    get_mime: true
+    get_attributes: true
+    follow: false
+  tags: issue_ssl
+
+- name: Test Nginx configuration
+  ansible.builtin.command:
+    cmd: nginx -t
+  changed_when: false
+  tags: issue_ssl
+# - name: Update WordPress home URL
+#   command:
+#     cmd: wp option update home 'http://{{domain}}'
+#     chdir: /sites/{{domain}}/files
+#   changed_when: false
+
+# - name: Update WordPress site URL
+#   command:
+#     cmd: wp option update siteurl 'http://{{domain}}'
+#     chdir: /sites/{{domain}}/files
+#   changed_when: false

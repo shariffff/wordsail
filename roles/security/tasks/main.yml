@@ -1,0 +1,32 @@
+---
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Start and enable UFW service
+  ansible.builtin.systemd:
+    name: ufw
+    state: started
+
+- name: Configure UFW rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  with_items:
+    - 22
+    - 80
+    - 443
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+    policy: deny
+
+- name: Configure SSH
+  ansible.builtin.template:
+    src: 00-wordsail.conf.j2
+    dest: /etc/ssh/sshd_config.d/00-wordsail.conf
+    mode: "0644"
+  notify: restart ssh

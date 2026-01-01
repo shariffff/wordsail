@@ -1,0 +1,72 @@
+---
+- name: Installing MariaDB
+  ansible.builtin.apt:
+    name:
+      - mariadb-server
+      - mariadb-client
+      - python3-mysqldb
+    state: present
+    update_cache: true
+
+- name: Ensure MySQL service is started and enabled
+  ansible.builtin.systemd:
+    name: mysql
+    state: started
+    enabled: true
+
+- name: Create MySQL configuration
+  ansible.builtin.template:
+    src: wordsail.cnf.j2
+    dest: /etc/mysql/conf.d/wordsail.cnf
+    mode: "0644"
+  notify: restart mariadb
+
+- name: Create MySQL systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/mariadb.service.d
+    state: directory
+    mode: "0755"
+
+- name: Create MySQL systemd override
+  ansible.builtin.template:
+    src: override.conf.j2
+    dest: /etc/systemd/system/mariadb.service.d/override.conf
+    mode: "0644"
+  notify: daemon-reload
+
+- name: Create root MySQL user configuration
+  ansible.builtin.template:
+    src: .root-my.cnf.j2
+    dest: /root/.my.cnf
+    mode: "0600"
+
+- name: Create wordsailbot MySQL user
+  community.mysql.mysql_user:
+    name: wordsailbot
+    host: localhost
+    password: "{{ mysql_wordsailbot_password }}"
+    priv: "*.*:ALL,GRANT"
+    state: present
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    plugin: mysql_native_password
+    update_password: always
+
+- name: Create wordsail MySQL user configuration
+  ansible.builtin.template:
+    src: .wordsail-my.cnf.j2
+    dest: /home/wordsail/.my.cnf
+    mode: "0600"
+    owner: wordsail
+
+- name: Remove test database
+  community.mysql.mysql_db:
+    name: test
+    state: absent
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Remove anonymous users
+  community.mysql.mysql_user:
+    name: ""
+    host_all: true
+    state: absent
+    login_unix_socket: /var/run/mysqld/mysqld.sock
