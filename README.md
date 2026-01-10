@@ -10,7 +10,6 @@ WordSail provides a complete solution for deploying and managing WordPress sites
 - 🔒 **Security hardened** - UFW firewall, Fail2ban, SSH hardening, automatic SSL with Let's Encrypt
 - 🎯 **Isolated WordPress sites** - Each site runs under its own user with dedicated PHP-FPM pool
 - 🛠️ **Intuitive CLI** - Interactive prompts for all operations (server, site, domain management)
-- 📦 **State management** - Configuration stored in `~/.wordsail/servers.yaml`
 - 🔄 **Infrastructure as code** - All configuration reproducible via Ansible
 
 ## Quick Start
@@ -65,14 +64,14 @@ wordsail/
 - **[Ansible Documentation](ansible/README.md)** - Playbooks, roles, and direct Ansible usage
 - **[CLAUDE.md](CLAUDE.md)** - Development guide for AI assistants
 
-## Technology Stack
-
 ### CLI
+
 - **Language**: Go 1.21+
 - **Framework**: Cobra (commands), Survey (interactive prompts)
 - **Config**: YAML-based state management
 
 ### Infrastructure
+
 - **Target OS**: Ubuntu 24.04
 - **Web Server**: Nginx (official repo)
 - **PHP**: 8.3 (ondrej/php PPA)
@@ -116,6 +115,7 @@ ansible-playbook --syntax-check provision.yml
 ## Installation Methods
 
 ### From Source (Current)
+
 ```bash
 git clone https://github.com/your-org/wordsail.git
 cd wordsail
@@ -124,6 +124,7 @@ wordsail init
 ```
 
 ### Future: Package Managers
+
 ```bash
 # Coming soon
 brew install wordsail
@@ -133,11 +134,13 @@ apt install wordsail
 ## Requirements
 
 ### CLI Usage
+
 - Go 1.21+ (for building from source)
 - Ansible 2.14+
 - SSH access to target servers
 
 ### Target Servers
+
 - Ubuntu 24.04 LTS
 - Fresh server (recommended)
 - Root SSH access for provisioning
@@ -152,6 +155,7 @@ apt install wordsail
 ## Common Workflows
 
 ### New Server Setup
+
 ```bash
 wordsail server add           # Add server details
 wordsail server provision     # Install LEMP stack
@@ -160,6 +164,7 @@ wordsail domain ssl           # Issue SSL certificate
 ```
 
 ### Adding Sites to Existing Server
+
 ```bash
 wordsail site create          # Interactive site creation
 wordsail domain add           # Add www subdomain
@@ -167,6 +172,7 @@ wordsail domain ssl           # Issue SSL certificate
 ```
 
 ### Managing Existing Sites
+
 ```bash
 wordsail site list            # View all sites
 wordsail domain add           # Add domain to site
@@ -175,33 +181,16 @@ wordsail site delete          # Remove site completely
 
 ## Roadmap
 
-### Phase 1: Core Functionality ✅
-- [x] Server provisioning
-- [x] Site creation and deletion
-- [x] Domain management
-- [x] SSL automation
-
-### Phase 2: Enhanced Management
-- [ ] Site backup/restore
+- [ ] SSO Login
+- [ ] Site backup/restore/download
 - [ ] Multi-PHP version support
-- [ ] Site cloning
+- [ ] Site cloning / Staging
 - [ ] Resource monitoring
-
-### Phase 3: Distribution
+- [ ] Debug Helper
 - [ ] Homebrew formula
 - [ ] APT repository
 - [ ] Auto-updates
 - [ ] Shell completions
-
-## Contributing
-
-This project is currently in active development. For issues or feature requests, please open an issue on GitHub.
-
-## License
-
-Copyright © 2025. All rights reserved.
-
-## Support
 
 - **CLI Help**: `wordsail --help` or `wordsail <command> --help`
 - **Documentation**: See [cli/README.md](cli/README.md) and [ansible/README.md](ansible/README.md)

@@ -58,10 +58,10 @@ Edit `~/.wordsail/servers.yaml` and set the correct Ansible project path:
 
 ```yaml
 ansible:
-  path: "/Users/yourname/Projects/ansible"  # Update this path
-  roles_path: "./roles"
-  inventory_path: "/tmp/wordsail-inventory-{timestamp}.ini"
-  python_interpreter: "/usr/bin/python3"
+  path: '/Users/yourname/Projects/ansible' # Update this path
+  roles_path: './roles'
+  inventory_path: '/tmp/wordsail-inventory-{timestamp}.ini'
+  python_interpreter: '/usr/bin/python3'
 ```
 
 ### 3. Add a Server
@@ -71,6 +71,7 @@ wordsail server add
 ```
 
 Follow the interactive prompts to add server details:
+
 - Server name (e.g., production-1)
 - Hostname or IP address
 - SSH user and port
@@ -186,28 +187,28 @@ wordsail domain ssl
 The configuration file is located at `~/.wordsail/servers.yaml`. Here's an example structure:
 
 ```yaml
-version: "1.0"
+version: '1.0'
 
 ansible:
-  path: "/Users/sharif/Projects/ansible"
-  roles_path: "./roles"
-  inventory_path: "/tmp/wordsail-inventory-{timestamp}.ini"
-  python_interpreter: "/usr/bin/python3"
+  path: '/Users/sharif/Projects/ansible'
+  roles_path: './roles'
+  inventory_path: '/tmp/wordsail-inventory-{timestamp}.ini'
+  python_interpreter: '/usr/bin/python3'
 
 global_vars:
-  certbot_email: "admin@example.com"
-  mysql_wordsailbot_password: "${MYSQL_WORDSAILBOT_PASSWORD}"
-  wordsail_ssh_key: "~/.ssh/wordsail_rsa.pub"
+  certbot_email: 'admin@example.com'
+  mysql_wordsailbot_password: '${MYSQL_WORDSAILBOT_PASSWORD}'
+  wordsail_ssh_key: '~/.ssh/wordsail_rsa.pub'
 
 servers:
-  - name: "production-1"
-    hostname: "prod1.example.com"
-    ip: "203.0.113.10"
+  - name: 'production-1'
+    hostname: 'prod1.example.com'
+    ip: '203.0.113.10'
     ssh:
-      user: "wordsail"
+      user: 'wordsail'
       port: 22
-      key_file: "~/.ssh/wordsail_rsa"
-    status: "unprovisioned"
+      key_file: '~/.ssh/wordsail_rsa'
+    status: 'unprovisioned'
     sites: []
 ```
 
@@ -262,55 +263,7 @@ cli/
 
 ## Roadmap
 
-### Phase 1: Foundation ✅
-- [x] Go module initialization
-- [x] Data models (Server, Site, Domain)
-- [x] Config loader/saver with YAML
-- [x] Cobra CLI structure
-- [x] Config commands (init/show/validate)
-- [x] Server commands (add/list/remove)
-
-### Phase 2: Ansible Integration ✅
-- [x] Inventory generator
-- [x] Ansible executor with real-time output
-- [x] Server provisioning command
-- [x] SSH connectivity checks
-- [x] State updates after provisioning
-
-### Phase 3: Site Management ✅
-- [x] Interactive site creation prompts
-- [x] Site create command with website.yml integration
-- [x] Site list command with formatted output
-- [x] Site delete command with confirmation
-- [x] Non-interactive mode for automation
-- [x] State updates after site operations
-
-### Phase 4: Domain Management ✅
-- [x] Interactive domain prompts
-- [x] Domain add command with optional SSL
-- [x] Domain remove command with warnings
-- [x] SSL certificate issuance command
-- [x] SSL expiration tracking
-- [x] State updates for domains
-
-### Phase 5: Polish
 - [ ] Shell completion scripts
 - [ ] Comprehensive error handling
 - [ ] Installation script
 - [ ] Release automation
-
-## Contributing
-
-This is currently a private project. For issues or feature requests, please contact the maintainer.
-
-## License
-
-Copyright © 2025. All rights reserved.
-
-## Support
-
-For help and documentation:
-```bash
-wordsail --help
-wordsail <command> --help
-```
