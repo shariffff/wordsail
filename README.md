@@ -18,7 +18,7 @@ WordSail provides a complete solution for deploying and managing WordPress sites
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/wordsail.git
+git clone https://github.com/shariffff/wordsail.git
 cd wordsail
 
 # Build and install the CLI
