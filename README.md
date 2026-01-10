@@ -1,129 +1,212 @@
-# WordSail Ansible
+# WordSail
 
-Automated WordPress hosting infrastructure using Ansible.
+**Automated WordPress hosting infrastructure and management CLI**
 
-## TL;DR
+WordSail provides a complete solution for deploying and managing WordPress sites on Ubuntu servers. It combines powerful Ansible playbooks with an intuitive CLI tool for streamlined operations.
+
+## Features
+
+- 🚀 **One-command server provisioning** - Full LEMP stack setup (Nginx, PHP 8.3, MariaDB)
+- 🔒 **Security hardened** - UFW firewall, Fail2ban, SSH hardening, automatic SSL with Let's Encrypt
+- 🎯 **Isolated WordPress sites** - Each site runs under its own user with dedicated PHP-FPM pool
+- 🛠️ **Intuitive CLI** - Interactive prompts for all operations (server, site, domain management)
+- 📦 **State management** - Configuration stored in `~/.wordsail/servers.yaml`
+- 🔄 **Infrastructure as code** - All configuration reproducible via Ansible
+
+## Quick Start
+
+### Installation
 
 ```bash
-# Provision a fresh Ubuntu server
-ansible-playbook provision.yml -i "SERVER_IP," -u root
+# Clone the repository
+git clone https://github.com/your-org/wordsail.git
+cd wordsail
+
+# Build and install the CLI
+make install
+
+# Initialize WordSail (copies Ansible playbooks to ~/.wordsail/)
+wordsail init
+```
+
+### Usage
+
+```bash
+# Add and provision a server
+wordsail server add
+wordsail server provision production-1
 
 # Create a WordPress site
-ansible-playbook website.yml -i "SERVER_IP," -u wordsail \
-  --extra-vars "domain=example.com system_name=examplecom wp_admin_user=admin wp_admin_email=admin@example.com wp_admin_password=SecurePass123"
+wordsail site create
+
+# Manage domains
+wordsail domain add
+wordsail domain ssl
+
+# List everything
+wordsail server list
+wordsail site list
 ```
 
-## What It Does
-
-| Playbook                          | Purpose                                               |
-| --------------------------------- | ----------------------------------------------------- |
-| `provision.yml`                   | Full server setup (Nginx, PHP 8.3, MariaDB, security) |
-| `website.yml`                     | Create isolated WordPress sites with SSL              |
-| `playbooks/domain_management.yml` | Add/remove domains, issue SSL certs                   |
-
-## Roles Overview
-
-| Role           | What It Does                                                                                  |
-| -------------- | --------------------------------------------------------------------------------------------- |
-| **bootstrap**  | Creates `wordsail` user, installs base packages, sets up certbot, configures fail2ban & redis |
-| **database**   | Installs MariaDB, creates admin user, secures installation                                    |
-| **nginx**      | Installs Nginx from official repo, configures global settings, generates default SSL          |
-| **php**        | Installs PHP 8.3 + extensions, Composer, WP-CLI, security hardening                           |
-| **security**   | UFW firewall (ports 22/80/443), SSH hardening                                                 |
-| **website**    | Creates site user, database, PHP-FPM pool, Nginx vhost, installs WordPress                    |
-| **libs**       | Reusable tasks: add_domain, remove_domain, issue_ssl                                          |
-| **operations** | Server ops: delete_site                                                                       |
-
-xw
-
-## Domain Management
-
-```bash
-# Add domain to Nginx
-ansible-playbook playbooks/domain_management.yml -i "IP," -u wordsail \
-  --extra-vars "operation=add_domain domain=newdomain.com system_name=sitename"
-
-# Remove domain
-ansible-playbook playbooks/domain_management.yml -i "IP," -u wordsail \
-  --extra-vars "operation=remove_domain domain=olddomain.com"
-
-# Issue SSL certificate
-ansible-playbook playbooks/domain_management.yml -i "IP," -u wordsail \
-  --extra-vars "operation=issue_ssl domain=example.com certbot_email=admin@example.com"
-```
-
-## Directory Structure
+## Project Structure
 
 ```
-ansible/
-├── provision.yml          # Server provisioning playbook
-├── website.yml            # WordPress site creation playbook
-├── playbooks/             # Additional playbooks
-│   └── domain_management.yml
-├── roles/
-│   ├── bootstrap/         # Base server setup
-│   ├── database/          # MariaDB installation
-│   ├── nginx/             # Web server config
-│   ├── php/               # PHP 8.3 + extensions
-│   ├── security/          # UFW + SSH hardening
-│   ├── website/           # WordPress deployment
-│   ├── libs/              # Reusable task libraries
-│   └── operations/        # Server operation tasks
-├── group_vars/
-│   └── all.yml            # Global variables
-├── inventory/             # Inventory files
-└── requirements.yml       # Ansible Galaxy dependencies
+wordsail/
+├── cli/           # Go CLI tool (see cli/README.md)
+├── ansible/       # Ansible playbooks and roles (see ansible/README.md)
+├── docs/          # Additional documentation
+├── Makefile       # Build automation
+└── version.txt    # Version tracking
 ```
 
-## Server Layout
+## Documentation
 
-After provisioning, servers have:
+- **[CLI Documentation](cli/README.md)** - CLI installation, commands, and development
+- **[Ansible Documentation](ansible/README.md)** - Playbooks, roles, and direct Ansible usage
+- **[CLAUDE.md](CLAUDE.md)** - Development guide for AI assistants
 
-```
-/sites/
-└── example.com/
-    ├── public/            # WordPress files
-    ├── logs/              # Site logs
+## Technology Stack
 
-/etc/nginx/sites-available/example.com/
-├── example.com            # Main config
-├── server/                # Server-level includes
-├── location/              # Location blocks
-├── before/                # Pre-processing rules
-└── after/                 # Post-processing (redirects)
-```
+### CLI
+- **Language**: Go 1.21+
+- **Framework**: Cobra (commands), Survey (interactive prompts)
+- **Config**: YAML-based state management
 
-## Requirements
-
-```bash
-# Install Ansible
-pip install ansible
-
-# Install required collections
-ansible-galaxy install -r requirements.yml
-```
-
-## Required Variables
-
-Set in `group_vars/all.yml` or pass via `--extra-vars`:
-
-| Variable                     | Description                      |
-| ---------------------------- | -------------------------------- |
-| `wordsail_ssh_key`           | SSH public key for wordsail user |
-| `mysql_wordsailbot_password` | MySQL admin password             |
-| `certbot_email`              | Email for Let's Encrypt          |
-
-## Stack
-
-- **OS**: Ubuntu 24.04
-- **Web**: Nginx (official repo)
+### Infrastructure
+- **Target OS**: Ubuntu 24.04
+- **Web Server**: Nginx (official repo)
 - **PHP**: 8.3 (ondrej/php PPA)
-- **DB**: MariaDB
+- **Database**: MariaDB
 - **Cache**: Redis
 - **SSL**: Let's Encrypt (Certbot)
 - **Security**: UFW, Fail2ban
 
-## Upcoming
+## Development
 
-- [ ] Multi-PHP version management
-- [ ] Backup/restore automation
+### Build Commands
+
+```bash
+# Build CLI
+make build
+
+# Run tests
+make test
+
+# Format code
+make fmt
+
+# Lint code
+make lint
+
+# Clean artifacts
+make clean
+```
+
+### Testing Ansible
+
+```bash
+# Validate Ansible playbook syntax
+make test-ansible
+
+# Or run directly
+cd ansible
+ansible-playbook --syntax-check provision.yml
+```
+
+## Installation Methods
+
+### From Source (Current)
+```bash
+git clone https://github.com/your-org/wordsail.git
+cd wordsail
+make install
+wordsail init
+```
+
+### Future: Package Managers
+```bash
+# Coming soon
+brew install wordsail
+apt install wordsail
+```
+
+## Requirements
+
+### CLI Usage
+- Go 1.21+ (for building from source)
+- Ansible 2.14+
+- SSH access to target servers
+
+### Target Servers
+- Ubuntu 24.04 LTS
+- Fresh server (recommended)
+- Root SSH access for provisioning
+
+## How It Works
+
+1. **CLI manages state** - Server and site configuration stored in `~/.wordsail/servers.yaml`
+2. **CLI executes Ansible** - Generates dynamic inventory and runs playbooks
+3. **Ansible configures servers** - Idempotent playbooks ensure consistent state
+4. **CLI updates state** - After successful operations, configuration is updated
+
+## Common Workflows
+
+### New Server Setup
+```bash
+wordsail server add           # Add server details
+wordsail server provision     # Install LEMP stack
+wordsail site create          # Create first WordPress site
+wordsail domain ssl           # Issue SSL certificate
+```
+
+### Adding Sites to Existing Server
+```bash
+wordsail site create          # Interactive site creation
+wordsail domain add           # Add www subdomain
+wordsail domain ssl           # Issue SSL certificate
+```
+
+### Managing Existing Sites
+```bash
+wordsail site list            # View all sites
+wordsail domain add           # Add domain to site
+wordsail site delete          # Remove site completely
+```
+
+## Roadmap
+
+### Phase 1: Core Functionality ✅
+- [x] Server provisioning
+- [x] Site creation and deletion
+- [x] Domain management
+- [x] SSL automation
+
+### Phase 2: Enhanced Management
+- [ ] Site backup/restore
+- [ ] Multi-PHP version support
+- [ ] Site cloning
+- [ ] Resource monitoring
+
+### Phase 3: Distribution
+- [ ] Homebrew formula
+- [ ] APT repository
+- [ ] Auto-updates
+- [ ] Shell completions
+
+## Contributing
+
+This project is currently in active development. For issues or feature requests, please open an issue on GitHub.
+
+## License
+
+Copyright © 2025. All rights reserved.
+
+## Support
+
+- **CLI Help**: `wordsail --help` or `wordsail <command> --help`
+- **Documentation**: See [cli/README.md](cli/README.md) and [ansible/README.md](ansible/README.md)
+- **Issues**: GitHub Issues
+
+---
+
+Built with ❤️ for WordPress hosting automation

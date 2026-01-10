@@ -1,0 +1,365 @@
+package cmd
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"github.com/wordsail/cli/internal/ansible"
+	"github.com/wordsail/cli/internal/config"
+	"github.com/wordsail/cli/internal/prompt"
+	"github.com/wordsail/cli/internal/state"
+	"github.com/wordsail/cli/pkg/models"
+)
+
+// domainCmd represents the domain command
+var domainCmd = &cobra.Command{
+	Use:   "domain",
+	Short: "Manage domains and SSL certificates",
+	Long:  `Add domains to sites, remove domains, and issue SSL certificates.`,
+}
+
+// domainAddCmd represents the domain add command
+var domainAddCmd = &cobra.Command{
+	Use:   "add",
+	Short: "Add a domain to a site",
+	Long:  `Add a new domain to an existing WordPress site and optionally issue an SSL certificate.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		mgr, err := config.NewManager()
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		if !mgr.ConfigExists() {
+			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			os.Exit(1)
+		}
+
+		cfg, err := mgr.Load()
+		if err != nil {
+			color.Red("Error: Failed to load configuration: %v", err)
+			os.Exit(1)
+		}
+
+		// Get input from prompts
+		input, err := prompt.PromptDomainAdd(cfg.Servers)
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		// Find the target server
+		var targetServer *models.Server
+		for i := range cfg.Servers {
+			if cfg.Servers[i].Name == input.ServerName {
+				targetServer = &cfg.Servers[i]
+				break
+			}
+		}
+
+		if targetServer == nil {
+			color.Red("Error: Server '%s' not found", input.ServerName)
+			os.Exit(1)
+		}
+
+		// Prepare extra vars for Ansible
+		extraVars := map[string]interface{}{
+			"operation":   "add_domain",
+			"domain":      input.Domain,
+			"system_name": input.SystemName,
+		}
+
+		// Create Ansible executor
+		executor := ansible.NewExecutor(cfg.Ansible.Path)
+
+		// Execute domain_management.yml playbook
+		fmt.Println()
+		color.Cyan("═══════════════════════════════════════════════════════")
+		color.Cyan("  Adding domain: %s", input.Domain)
+		color.Cyan("═══════════════════════════════════════════════════════")
+		fmt.Println()
+
+		if err := executor.ExecutePlaybook("playbooks/domain_management.yml", *targetServer, extraVars, cfg.GlobalVars); err != nil {
+			color.Red("\n✗ Domain addition failed: %v", err)
+			os.Exit(1)
+		}
+
+		// Add domain to configuration
+		newDomain := models.Domain{
+			Domain:     input.Domain,
+			SSLEnabled: false,
+		}
+
+		stateMgr := state.NewManager(mgr)
+		if err := stateMgr.AddDomainToSite(input.ServerName, input.SystemName, newDomain); err != nil {
+			color.Red("Warning: Failed to update configuration: %v", err)
+		}
+
+		color.Green("\n✓ Domain '%s' added successfully", input.Domain)
+
+		// Issue SSL if requested
+		if input.IssueSSL {
+			fmt.Println()
+			color.Cyan("═══════════════════════════════════════════════════════")
+			color.Cyan("  Issuing SSL certificate for: %s", input.Domain)
+			color.Cyan("═══════════════════════════════════════════════════════")
+			fmt.Println()
+
+			// Get certbot email from global vars
+			certbotEmail := "admin@example.com"
+			if email, ok := cfg.GlobalVars["certbot_email"].(string); ok {
+				certbotEmail = email
+			}
+
+			sslVars := map[string]interface{}{
+				"operation":     "issue_ssl",
+				"domain":        input.Domain,
+				"certbot_email": certbotEmail,
+			}
+
+			if err := executor.ExecutePlaybook("playbooks/domain_management.yml", *targetServer, sslVars, cfg.GlobalVars); err != nil {
+				color.Red("\n✗ SSL certificate issuance failed: %v", err)
+				fmt.Println("The domain has been added but SSL is not configured.")
+				fmt.Println("You can issue SSL later with: wordsail domain ssl")
+				os.Exit(1)
+			}
+
+			// Update domain with SSL info
+			now := time.Now()
+			expiresAt := now.AddDate(0, 3, 0) // SSL certs expire in 90 days
+
+			sslDomain := models.Domain{
+				Domain:       input.Domain,
+				SSLEnabled:   true,
+				SSLIssuedAt:  &now,
+				SSLExpiresAt: &expiresAt,
+			}
+
+			if err := stateMgr.UpdateDomainSSL(input.ServerName, input.SystemName, input.Domain, sslDomain); err != nil {
+				color.Red("Warning: Failed to update SSL status in configuration: %v", err)
+			}
+
+			color.Green("\n✓ SSL certificate issued successfully")
+			fmt.Println()
+			fmt.Printf("Domain URL:  https://%s\n", input.Domain)
+			fmt.Printf("Expires:     %s\n", expiresAt.Format("2006-01-02"))
+		} else {
+			fmt.Println()
+			fmt.Printf("Domain URL:  http://%s\n", input.Domain)
+			fmt.Println()
+			fmt.Println("To issue SSL later: wordsail domain ssl")
+		}
+	},
+}
+
+// domainRemoveCmd represents the domain remove command
+var domainRemoveCmd = &cobra.Command{
+	Use:   "remove",
+	Short: "Remove a domain from a site",
+	Long:  `Remove a domain from a WordPress site and its Nginx configuration.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		mgr, err := config.NewManager()
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		if !mgr.ConfigExists() {
+			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			os.Exit(1)
+		}
+
+		cfg, err := mgr.Load()
+		if err != nil {
+			color.Red("Error: Failed to load configuration: %v", err)
+			os.Exit(1)
+		}
+
+		// Get input from prompts
+		input, err := prompt.PromptDomainRemove(cfg.Servers)
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		// Find the target server
+		var targetServer *models.Server
+		for i := range cfg.Servers {
+			if cfg.Servers[i].Name == input.ServerName {
+				targetServer = &cfg.Servers[i]
+				break
+			}
+		}
+
+		if targetServer == nil {
+			color.Red("Error: Server '%s' not found", input.ServerName)
+			os.Exit(1)
+		}
+
+		// Final confirmation
+		color.Yellow("\n⚠️  WARNING: This will remove:")
+		fmt.Printf("  - Domain: %s\n", input.Domain)
+		fmt.Printf("  - Nginx configuration\n")
+		fmt.Printf("  - SSL certificate (if any)\n")
+		fmt.Println()
+
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			var confirm bool
+			if err := survey.AskOne(&survey.Confirm{
+				Message: "Remove this domain?",
+				Default: false,
+			}, &confirm); err != nil {
+				os.Exit(1)
+			}
+
+			if !confirm {
+				fmt.Println("Domain removal cancelled")
+				return
+			}
+		}
+
+		// Prepare extra vars for Ansible
+		extraVars := map[string]interface{}{
+			"operation": "remove_domain",
+			"domain":    input.Domain,
+		}
+
+		// Create Ansible executor
+		executor := ansible.NewExecutor(cfg.Ansible.Path)
+
+		// Execute domain_management.yml playbook
+		fmt.Println()
+		color.Cyan("═══════════════════════════════════════════════════════")
+		color.Cyan("  Removing domain: %s", input.Domain)
+		color.Cyan("═══════════════════════════════════════════════════════")
+		fmt.Println()
+
+		if err := executor.ExecutePlaybook("playbooks/domain_management.yml", *targetServer, extraVars, cfg.GlobalVars); err != nil {
+			color.Red("\n✗ Domain removal failed: %v", err)
+			os.Exit(1)
+		}
+
+		// Remove domain from configuration
+		stateMgr := state.NewManager(mgr)
+		if err := stateMgr.RemoveDomainFromSite(input.ServerName, input.SystemName, input.Domain); err != nil {
+			color.Red("Warning: Failed to update configuration: %v", err)
+		}
+
+		color.Green("\n✓ Domain '%s' removed successfully", input.Domain)
+	},
+}
+
+// domainSSLCmd represents the domain ssl command
+var domainSSLCmd = &cobra.Command{
+	Use:   "ssl",
+	Short: "Issue SSL certificate for a domain",
+	Long:  `Obtain a Let's Encrypt SSL certificate for a domain.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		mgr, err := config.NewManager()
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		if !mgr.ConfigExists() {
+			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			os.Exit(1)
+		}
+
+		cfg, err := mgr.Load()
+		if err != nil {
+			color.Red("Error: Failed to load configuration: %v", err)
+			os.Exit(1)
+		}
+
+		// Get default certbot email from config
+		defaultEmail := "admin@example.com"
+		if email, ok := cfg.GlobalVars["certbot_email"].(string); ok {
+			defaultEmail = email
+		}
+
+		// Get input from prompts
+		input, err := prompt.PromptDomainSSL(cfg.Servers, defaultEmail)
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		// Find the target server
+		var targetServer *models.Server
+		for i := range cfg.Servers {
+			if cfg.Servers[i].Name == input.ServerName {
+				targetServer = &cfg.Servers[i]
+				break
+			}
+		}
+
+		if targetServer == nil {
+			color.Red("Error: Server '%s' not found", input.ServerName)
+			os.Exit(1)
+		}
+
+		// Prepare extra vars for Ansible
+		extraVars := map[string]interface{}{
+			"operation":     "issue_ssl",
+			"domain":        input.Domain,
+			"certbot_email": input.CertbotEmail,
+		}
+
+		// Create Ansible executor
+		executor := ansible.NewExecutor(cfg.Ansible.Path)
+
+		// Execute domain_management.yml playbook
+		fmt.Println()
+		color.Cyan("═══════════════════════════════════════════════════════")
+		color.Cyan("  Issuing SSL certificate for: %s", input.Domain)
+		color.Cyan("═══════════════════════════════════════════════════════")
+		fmt.Println()
+
+		if err := executor.ExecutePlaybook("playbooks/domain_management.yml", *targetServer, extraVars, cfg.GlobalVars); err != nil {
+			color.Red("\n✗ SSL certificate issuance failed: %v", err)
+			os.Exit(1)
+		}
+
+		// Update domain with SSL info
+		now := time.Now()
+		expiresAt := now.AddDate(0, 3, 0) // SSL certs expire in 90 days
+
+		sslDomain := models.Domain{
+			Domain:       input.Domain,
+			SSLEnabled:   true,
+			SSLIssuedAt:  &now,
+			SSLExpiresAt: &expiresAt,
+		}
+
+		stateMgr := state.NewManager(mgr)
+		if err := stateMgr.UpdateDomainSSL(input.ServerName, input.SystemName, input.Domain, sslDomain); err != nil {
+			color.Red("Warning: Failed to update configuration: %v", err)
+		}
+
+		fmt.Println()
+		color.Green("═══════════════════════════════════════════════════════")
+		color.Green("  ✓ SSL certificate issued successfully!")
+		color.Green("═══════════════════════════════════════════════════════")
+		fmt.Println()
+		fmt.Printf("Domain:      https://%s\n", input.Domain)
+		fmt.Printf("Issued:      %s\n", now.Format("2006-01-02"))
+		fmt.Printf("Expires:     %s\n", expiresAt.Format("2006-01-02"))
+		fmt.Printf("Auto-renew:  Certbot will auto-renew before expiration\n")
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(domainCmd)
+	domainCmd.AddCommand(domainAddCmd)
+	domainCmd.AddCommand(domainRemoveCmd)
+	domainCmd.AddCommand(domainSSLCmd)
+
+	// Flags
+	domainRemoveCmd.Flags().BoolP("force", "f", false, "Force removal without confirmation")
+}
