@@ -11,7 +11,6 @@ type Database struct {
 
 // Metadata holds additional site information
 type Metadata struct {
-	FreeSite      bool       `yaml:"free_site"`
 	BackupEnabled bool       `yaml:"backup_enabled"`
 	LastBackup    *time.Time `yaml:"last_backup,omitempty"`
 }

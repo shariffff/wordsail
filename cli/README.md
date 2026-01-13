@@ -1,15 +1,15 @@
 # WordSail CLI
 
-A command-line interface tool for managing WordPress hosting infrastructure using Ansible. WordSail provides an intuitive, interactive wrapper around Ansible playbooks for server provisioning, site creation, and domain management.
+A command-line interface tool for managing WordPress hosting infrastructure using Ansible. WordSail provides both an intuitive, interactive mode for manual operations and a script mode with flags for automation and CI/CD pipelines.
 
 ## Features
 
-- **Interactive Prompts**: User-friendly interactive prompts for all operations
+- **Dual Operating Modes**: Interactive prompts for manual use, script mode with flags for automation
 - **YAML-based State Management**: All configuration stored in `~/.wordsail/servers.yaml`
 - **Ansible Integration**: Seamlessly executes existing Ansible playbooks
 - **Server Management**: Add, list, remove, and provision servers
-- **Site Management**: Create, list, and delete WordPress sites (coming soon)
-- **Domain Management**: Add domains and manage SSL certificates (coming soon)
+- **Site Management**: Create, list, and delete WordPress sites
+- **Domain Management**: Add domains and manage SSL certificates
 
 ## Installation
 
@@ -89,6 +89,50 @@ wordsail server list
 wordsail config validate
 ```
 
+## Operating Modes
+
+WordSail CLI supports two modes of operation:
+
+### Interactive Mode (Default)
+
+When you run commands without flags, the CLI guides you through the process with interactive prompts.
+
+```bash
+wordsail site create
+# Prompts you for: server, domain, system name, admin credentials
+```
+
+**Use interactive mode when:**
+- Learning the tool
+- Performing manual operations
+- You want validation and helpful hints
+- Exploring available options
+
+### Script Mode (Non-Interactive)
+
+Provide all parameters as command-line flags for fully automated operations.
+
+```bash
+wordsail site create --non-interactive \
+  --server production-1 \
+  --domain example.com \
+  --system-name examplecom \
+  --admin-user admin \
+  --admin-email admin@example.com \
+  --admin-password SecurePass123!
+```
+
+**Use script mode when:**
+- Automating deployments
+- Running in CI/CD pipelines
+- Scripting repetitive tasks
+- No user interaction is possible
+
+**Common flags for script mode:**
+- `--non-interactive`: Required flag to enable script mode
+- `--force`: Skip confirmation prompts
+- `--skip-ssh-check`: Skip SSH connectivity validation
+
 ## Commands
 
 ### Configuration Management
@@ -137,8 +181,7 @@ wordsail site create --non-interactive \
   --system-name examplecom \
   --admin-user admin \
   --admin-email admin@example.com \
-  --admin-password SecurePass123! \
-  --free-site
+  --admin-password SecurePass123!
 
 # List all sites
 wordsail site list

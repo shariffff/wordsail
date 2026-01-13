@@ -24,32 +24,62 @@ var domainCmd = &cobra.Command{
 
 // domainAddCmd represents the domain add command
 var domainAddCmd = &cobra.Command{
-	Use:   "add",
-	Short: "Add a domain to a site",
-	Long:  `Add a new domain to an existing WordPress site and optionally issue an SSL certificate.`,
+	Use:     "add",
+	Aliases: []string{"create"},
+	Short:   "Add a domain to a site",
+	Long: `Add a new domain to an existing WordPress site and optionally issue an SSL certificate.
+
+Examples:
+  # Interactive mode
+  wordsail domain add
+
+  # Non-interactive mode (for automation/AI agents)
+  wordsail domain add --server myserver --site mysite --domain www.example.com --ssl`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
-			color.Red("Error: %v", err)
+			outputError(cmd, "Failed to create config manager", err)
 			os.Exit(1)
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
 			os.Exit(1)
 		}
 
 		cfg, err := mgr.Load()
 		if err != nil {
-			color.Red("Error: Failed to load configuration: %v", err)
+			outputError(cmd, "Failed to load configuration", err)
 			os.Exit(1)
 		}
 
-		// Get input from prompts
-		input, err := prompt.PromptDomainAdd(cfg.Servers)
-		if err != nil {
-			color.Red("Error: %v", err)
+		var input *prompt.DomainAddInput
+
+		// Check for non-interactive mode
+		serverName, _ := cmd.Flags().GetString("server")
+		siteName, _ := cmd.Flags().GetString("site")
+		domain, _ := cmd.Flags().GetString("domain")
+
+		if serverName != "" && siteName != "" && domain != "" {
+			// Non-interactive mode
+			issueSSL, _ := cmd.Flags().GetBool("ssl")
+			input = &prompt.DomainAddInput{
+				ServerName: serverName,
+				SystemName: siteName,
+				Domain:     domain,
+				IssueSSL:   issueSSL,
+			}
+		} else if serverName != "" || siteName != "" || domain != "" {
+			outputError(cmd, "Incomplete flags", fmt.Errorf("--server, --site, and --domain are all required for non-interactive mode"))
 			os.Exit(1)
+		} else {
+			// Interactive mode - get input from prompts
+			var err error
+			input, err = prompt.PromptDomainAdd(cfg.Servers)
+			if err != nil {
+				outputError(cmd, "Failed to get domain details", err)
+				os.Exit(1)
+			}
 		}
 
 		// Find the target server
@@ -75,6 +105,8 @@ var domainAddCmd = &cobra.Command{
 
 		// Create Ansible executor
 		executor := ansible.NewExecutor(cfg.Ansible.Path)
+		executor.SetVerbose(Verbose)
+		executor.SetDryRun(DryRun)
 
 		// Execute domain_management.yml playbook
 		fmt.Println()
@@ -158,9 +190,10 @@ var domainAddCmd = &cobra.Command{
 
 // domainRemoveCmd represents the domain remove command
 var domainRemoveCmd = &cobra.Command{
-	Use:   "remove",
-	Short: "Remove a domain from a site",
-	Long:  `Remove a domain from a WordPress site and its Nginx configuration.`,
+	Use:     "remove",
+	Aliases: []string{"delete"},
+	Short:   "Remove a domain from a site",
+	Long:    `Remove a domain from a WordPress site and its Nginx configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
@@ -231,6 +264,8 @@ var domainRemoveCmd = &cobra.Command{
 
 		// Create Ansible executor
 		executor := ansible.NewExecutor(cfg.Ansible.Path)
+		executor.SetVerbose(Verbose)
+		executor.SetDryRun(DryRun)
 
 		// Execute domain_management.yml playbook
 		fmt.Println()
@@ -313,6 +348,8 @@ var domainSSLCmd = &cobra.Command{
 
 		// Create Ansible executor
 		executor := ansible.NewExecutor(cfg.Ansible.Path)
+		executor.SetVerbose(Verbose)
+		executor.SetDryRun(DryRun)
 
 		// Execute domain_management.yml playbook
 		fmt.Println()
@@ -360,6 +397,24 @@ func init() {
 	domainCmd.AddCommand(domainRemoveCmd)
 	domainCmd.AddCommand(domainSSLCmd)
 
-	// Flags
+	// domain add flags (non-interactive mode)
+	domainAddCmd.Flags().String("server", "", "Server name")
+	domainAddCmd.Flags().String("site", "", "Site system name")
+	domainAddCmd.Flags().String("domain", "", "Domain to add")
+	domainAddCmd.Flags().Bool("ssl", false, "Issue SSL certificate for the domain")
+	domainAddCmd.Flags().Bool("json", false, "Output in JSON format")
+
+	// domain remove flags
+	domainRemoveCmd.Flags().String("server", "", "Server name")
+	domainRemoveCmd.Flags().String("site", "", "Site system name")
+	domainRemoveCmd.Flags().String("domain", "", "Domain to remove")
 	domainRemoveCmd.Flags().BoolP("force", "f", false, "Force removal without confirmation")
+	domainRemoveCmd.Flags().Bool("json", false, "Output in JSON format")
+
+	// domain ssl flags (non-interactive mode)
+	domainSSLCmd.Flags().String("server", "", "Server name")
+	domainSSLCmd.Flags().String("site", "", "Site system name")
+	domainSSLCmd.Flags().String("domain", "", "Domain to issue SSL for")
+	domainSSLCmd.Flags().String("email", "", "Email for Let's Encrypt notifications")
+	domainSSLCmd.Flags().Bool("json", false, "Output in JSON format")
 }

@@ -247,7 +247,6 @@ For `website.yml`:
 | `wp_admin_user` | WordPress admin username |
 | `wp_admin_email` | WordPress admin email |
 | `wp_admin_password` | WordPress admin password |
-| `free_site` | Optional boolean (default: false) |
 
 ## Technology Stack
 

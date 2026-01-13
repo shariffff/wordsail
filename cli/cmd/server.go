@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -19,44 +20,92 @@ import (
 var serverCmd = &cobra.Command{
 	Use:   "server",
 	Short: "Manage servers",
-	Long:  `Add, list, remove, and provision servers.`,
+	Long: `Add, list, remove, and provision servers.
+
+The 'provision' command provides an interactive way to add and provision a new server in one step.`,
 }
 
 // serverAddCmd represents the server add command
 var serverAddCmd = &cobra.Command{
 	Use:   "add",
-	Short: "Add a new server",
-	Long:  `Interactively add a new server to the configuration.`,
+	Short: "Add a new server without provisioning",
+	Long: `Add a new server to the configuration without provisioning it.
+
+For most users, use 'wordsail server provision' instead, which adds and provisions in one step.
+
+Examples:
+  # Interactive mode
+  wordsail server add
+
+  # Non-interactive mode (for automation/AI agents)
+  wordsail server add --name myserver --ip 1.2.3.4 --ssh-key ~/.ssh/id_rsa --ssh-user root`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
-			color.Red("Error: %v", err)
+			outputError(cmd, "Failed to create config manager", err)
 			os.Exit(1)
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
 			os.Exit(1)
 		}
 
 		// Load existing config
 		cfg, err := mgr.Load()
 		if err != nil {
-			color.Red("Error: Failed to load configuration: %v", err)
+			outputError(cmd, "Failed to load configuration", err)
 			os.Exit(1)
 		}
 
-		// Prompt for server details
-		input, err := prompt.PromptServerAdd()
-		if err != nil {
-			color.Red("Error: %v", err)
+		var input *prompt.ServerInput
+
+		// Check for non-interactive mode
+		name, _ := cmd.Flags().GetString("name")
+		ip, _ := cmd.Flags().GetString("ip")
+
+		if name != "" && ip != "" {
+			// Non-interactive mode
+			sshKey, _ := cmd.Flags().GetString("ssh-key")
+			sshUser, _ := cmd.Flags().GetString("ssh-user")
+			sshPort, _ := cmd.Flags().GetInt("ssh-port")
+
+			if sshKey == "" {
+				outputError(cmd, "Missing required flag", fmt.Errorf("--ssh-key is required in non-interactive mode"))
+				os.Exit(1)
+			}
+
+			input = &prompt.ServerInput{
+				Name:     name,
+				Hostname: ip,
+				IP:       ip,
+				SSHKey:   sshKey,
+				SSHUser:  sshUser,
+				SSHPort:  sshPort,
+			}
+
+			if input.SSHUser == "" {
+				input.SSHUser = "root"
+			}
+			if input.SSHPort == 0 {
+				input.SSHPort = 22
+			}
+		} else if name != "" || ip != "" {
+			outputError(cmd, "Incomplete flags", fmt.Errorf("both --name and --ip are required for non-interactive mode"))
 			os.Exit(1)
+		} else {
+			// Interactive mode - prompt for server details
+			input, err = prompt.PromptServerAdd()
+			if err != nil {
+				outputError(cmd, "Failed to get server details", err)
+				os.Exit(1)
+			}
 		}
 
 		// Check for duplicate server name
 		for _, server := range cfg.Servers {
 			if server.Name == input.Name {
-				color.Red("Error: Server with name '%s' already exists", input.Name)
+				outputError(cmd, "Server already exists", fmt.Errorf("server with name '%s' already exists", input.Name))
 				os.Exit(1)
 			}
 		}
@@ -67,14 +116,21 @@ var serverAddCmd = &cobra.Command{
 
 		// Save config
 		if err := mgr.Save(cfg); err != nil {
-			color.Red("Error: Failed to save configuration: %v", err)
+			outputError(cmd, "Failed to save configuration", err)
 			os.Exit(1)
 		}
 
-		color.Green("✓ Server '%s' added successfully", input.Name)
-		fmt.Println()
-		fmt.Println("Next steps:")
-		fmt.Printf("  Provision the server: wordsail server provision %s\n", input.Name)
+		outputSuccess(cmd, "server_added", map[string]interface{}{
+			"name":   input.Name,
+			"ip":     input.IP,
+			"status": "unprovisioned",
+		})
+
+		if !isJSONOutput(cmd) {
+			fmt.Println()
+			fmt.Println("Next steps:")
+			fmt.Printf("  Provision the server: wordsail server provision %s\n", input.Name)
+		}
 	},
 }
 
@@ -101,9 +157,21 @@ var serverListCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Check for JSON output
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+		if jsonOutput {
+			output, err := json.MarshalIndent(cfg.Servers, "", "  ")
+			if err != nil {
+				color.Red("Error: Failed to marshal JSON: %v", err)
+				os.Exit(1)
+			}
+			fmt.Println(string(output))
+			return
+		}
+
 		if len(cfg.Servers) == 0 {
 			fmt.Println("No servers configured.")
-			fmt.Println("Add a server with: wordsail server add")
+			fmt.Println("Add and provision a server with: wordsail server provision")
 			return
 		}
 
@@ -144,13 +212,18 @@ var serverListCmd = &cobra.Command{
 
 // serverRemoveCmd represents the server remove command
 var serverRemoveCmd = &cobra.Command{
-	Use:   "remove <name>",
-	Short: "Remove a server",
-	Long:  `Remove a server from the configuration by name.`,
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		serverName := args[0]
+	Use:     "remove [name]",
+	Aliases: []string{"delete"},
+	Short:   "Remove a server from inventory",
+	Long: `Remove a server from the WordSail inventory.
 
+If no name is provided, you will be prompted to select a server to remove.
+
+Note: This only removes the server from the WordSail inventory. The actual server
+and its resources will still exist in your cloud provider. You must manually
+delete the server from your cloud provider (AWS, DigitalOcean, etc.) if needed.`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
 			color.Red("Error: %v", err)
@@ -166,6 +239,40 @@ var serverRemoveCmd = &cobra.Command{
 		if err != nil {
 			color.Red("Error: Failed to load configuration: %v", err)
 			os.Exit(1)
+		}
+
+		if len(cfg.Servers) == 0 {
+			fmt.Println("No servers configured.")
+			return
+		}
+
+		var serverName string
+
+		// Interactive mode: no server name provided
+		if len(args) == 0 {
+			// Build options list
+			options := make([]string, len(cfg.Servers))
+			for i, server := range cfg.Servers {
+				siteCount := len(server.Sites)
+				siteLabel := "sites"
+				if siteCount == 1 {
+					siteLabel = "site"
+				}
+				options[i] = fmt.Sprintf("%s (%s) - %d %s", server.Name, server.IP, siteCount, siteLabel)
+			}
+
+			var selected int
+			selectPrompt := &survey.Select{
+				Message: "Select a server to remove:",
+				Options: options,
+			}
+			if err := survey.AskOne(selectPrompt, &selected); err != nil {
+				os.Exit(1)
+			}
+
+			serverName = cfg.Servers[selected].Name
+		} else {
+			serverName = args[0]
 		}
 
 		// Find and remove server
@@ -187,25 +294,32 @@ var serverRemoveCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Show warning about cloud provider
+		fmt.Println()
+		color.Yellow("Warning: This will remove '%s' from the WordSail inventory only.", serverName)
+		fmt.Println("The server will still exist in your cloud provider.")
+		fmt.Println("You must manually delete it from your cloud provider if needed.")
+		fmt.Println()
+
 		// Warn if server has sites
 		if len(removedServer.Sites) > 0 {
-			color.Yellow("Warning: Server '%s' has %d site(s)", serverName, len(removedServer.Sites))
-			fmt.Println("Removing the server will also remove all site records.")
+			color.Yellow("This server has %d site(s) that will also be removed from the inventory.", len(removedServer.Sites))
+			fmt.Println()
+		}
 
-			force, _ := cmd.Flags().GetBool("force")
-			if !force {
-				var confirm bool
-				if err := survey.AskOne(&survey.Confirm{
-					Message: "Are you sure you want to remove this server?",
-					Default: false,
-				}, &confirm); err != nil {
-					os.Exit(1)
-				}
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			var confirm bool
+			if err := survey.AskOne(&survey.Confirm{
+				Message: fmt.Sprintf("Remove server '%s' from inventory?", serverName),
+				Default: false,
+			}, &confirm); err != nil {
+				os.Exit(1)
+			}
 
-				if !confirm {
-					fmt.Println("Server removal cancelled")
-					return
-				}
+			if !confirm {
+				fmt.Println("Server removal cancelled")
+				return
 			}
 		}
 
@@ -217,49 +331,150 @@ var serverRemoveCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		color.Green("✓ Server '%s' removed successfully", serverName)
+		color.Green("✓ Server '%s' removed from inventory", serverName)
 	},
 }
 
 // serverProvisionCmd represents the server provision command
 var serverProvisionCmd = &cobra.Command{
-	Use:   "provision <name>",
+	Use:   "provision [name]",
 	Short: "Provision a server",
-	Long:  `Run the provision.yml playbook to set up a server with Nginx, PHP, MariaDB, and security hardening.`,
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		serverName := args[0]
+	Long: `Run the provision.yml playbook to set up a server with Nginx, PHP, MariaDB, and security hardening.
 
+If no name is provided, you will be prompted to add a new server and provision it immediately.
+If a name is provided, the existing server will be provisioned.
+
+Examples:
+  # Interactive mode - add and provision new server
+  wordsail server provision
+
+  # Provision existing server by name
+  wordsail server provision myserver
+
+  # Non-interactive mode - add and provision new server (for automation/AI agents)
+  wordsail server provision --name myserver --ip 1.2.3.4 --ssh-key ~/.ssh/id_rsa --force`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
-			color.Red("Error: %v", err)
+			outputError(cmd, "Failed to create config manager", err)
 			os.Exit(1)
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
 			os.Exit(1)
 		}
 
 		cfg, err := mgr.Load()
 		if err != nil {
-			color.Red("Error: Failed to load configuration: %v", err)
+			outputError(cmd, "Failed to load configuration", err)
 			os.Exit(1)
 		}
 
-		// Find the server
 		var targetServer *models.Server
-		for i := range cfg.Servers {
-			if cfg.Servers[i].Name == serverName {
-				targetServer = &cfg.Servers[i]
-				break
-			}
-		}
+		var serverName string
 
-		if targetServer == nil {
-			color.Red("Error: Server '%s' not found", serverName)
-			fmt.Println("Run 'wordsail server list' to see available servers.")
+		// Check for non-interactive mode via flags
+		flagName, _ := cmd.Flags().GetString("name")
+		flagIP, _ := cmd.Flags().GetString("ip")
+
+		if len(args) > 0 {
+			// Provision existing server by name argument
+			serverName = args[0]
+
+			// Find the server
+			for i := range cfg.Servers {
+				if cfg.Servers[i].Name == serverName {
+					targetServer = &cfg.Servers[i]
+					break
+				}
+			}
+
+			if targetServer == nil {
+				outputError(cmd, "Server not found", fmt.Errorf("server '%s' not found. Run 'wordsail server list' to see available servers", serverName))
+				os.Exit(1)
+			}
+		} else if flagName != "" && flagIP != "" {
+			// Non-interactive mode: create new server from flags
+			sshKey, _ := cmd.Flags().GetString("ssh-key")
+			sshUser, _ := cmd.Flags().GetString("ssh-user")
+			sshPort, _ := cmd.Flags().GetInt("ssh-port")
+
+			if sshKey == "" {
+				outputError(cmd, "Missing required flag", fmt.Errorf("--ssh-key is required in non-interactive mode"))
+				os.Exit(1)
+			}
+
+			// Check for duplicate server name
+			for _, server := range cfg.Servers {
+				if server.Name == flagName {
+					outputError(cmd, "Server already exists", fmt.Errorf("server with name '%s' already exists", flagName))
+					os.Exit(1)
+				}
+			}
+
+			// Create new server
+			newServer := models.Server{
+				Name:     flagName,
+				Hostname: flagIP,
+				IP:       flagIP,
+				SSH: models.SSHConfig{
+					User:    sshUser,
+					Port:    sshPort,
+					KeyFile: sshKey,
+				},
+				Status: "unprovisioned",
+				Sites:  []models.Site{},
+			}
+
+			cfg.Servers = append(cfg.Servers, newServer)
+
+			// Save config
+			if err := mgr.Save(cfg); err != nil {
+				outputError(cmd, "Failed to save configuration", err)
+				os.Exit(1)
+			}
+
+			outputInfo(cmd, "✓ Server '%s' added to configuration\n\n", flagName)
+
+			serverName = flagName
+			targetServer = &cfg.Servers[len(cfg.Servers)-1]
+		} else if flagName != "" || flagIP != "" {
+			outputError(cmd, "Incomplete flags", fmt.Errorf("both --name and --ip are required for non-interactive mode"))
 			os.Exit(1)
+		} else {
+			// Interactive mode: prompt for server details
+			input, err := prompt.PromptServerAdd()
+			if err != nil {
+				outputError(cmd, "Failed to get server details", err)
+				os.Exit(1)
+			}
+
+			// Check for duplicate server name
+			for _, server := range cfg.Servers {
+				if server.Name == input.Name {
+					outputError(cmd, "Server already exists", fmt.Errorf("server with name '%s' already exists", input.Name))
+					os.Exit(1)
+				}
+			}
+
+			// Add server to config
+			newServer := input.ToServer()
+			cfg.Servers = append(cfg.Servers, newServer)
+
+			// Save config
+			if err := mgr.Save(cfg); err != nil {
+				outputError(cmd, "Failed to save configuration", err)
+				os.Exit(1)
+			}
+
+			color.Green("✓ Server '%s' added to configuration", input.Name)
+			fmt.Println()
+
+			// Set target server for provisioning
+			serverName = input.Name
+			targetServer = &cfg.Servers[len(cfg.Servers)-1]
 		}
 
 		// Check if already provisioned
@@ -329,6 +544,8 @@ var serverProvisionCmd = &cobra.Command{
 
 		// Create Ansible executor
 		executor := ansible.NewExecutor(cfg.Ansible.Path)
+		executor.SetVerbose(Verbose)
+		executor.SetDryRun(DryRun)
 
 		// Execute provision.yml playbook
 		fmt.Println()
@@ -363,16 +580,317 @@ var serverProvisionCmd = &cobra.Command{
 	},
 }
 
+// serverHealthCheckCmd represents the server health-check command
+var serverHealthCheckCmd = &cobra.Command{
+	Use:     "health-check [name]",
+	Aliases: []string{"check", "ping"},
+	Short:   "Check server connectivity and health",
+	Long: `Test SSH connectivity and verify services are running on a server.
+
+Examples:
+  # Check a specific server
+  wordsail server health-check myserver
+
+  # Interactively select a server to check
+  wordsail server health-check`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		mgr, err := config.NewManager()
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		if !mgr.ConfigExists() {
+			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			os.Exit(1)
+		}
+
+		cfg, err := mgr.Load()
+		if err != nil {
+			color.Red("Error: Failed to load configuration: %v", err)
+			os.Exit(1)
+		}
+
+		if len(cfg.Servers) == 0 {
+			fmt.Println("No servers configured.")
+			return
+		}
+
+		var serverName string
+
+		if len(args) == 0 {
+			// Interactive mode
+			options := make([]string, len(cfg.Servers))
+			for i, server := range cfg.Servers {
+				options[i] = fmt.Sprintf("%s (%s) - %s", server.Name, server.IP, server.Status)
+			}
+
+			var selected int
+			selectPrompt := &survey.Select{
+				Message: "Select a server to check:",
+				Options: options,
+			}
+			if err := survey.AskOne(selectPrompt, &selected); err != nil {
+				os.Exit(1)
+			}
+			serverName = cfg.Servers[selected].Name
+		} else {
+			serverName = args[0]
+		}
+
+		// Find server
+		var targetServer *models.Server
+		for i := range cfg.Servers {
+			if cfg.Servers[i].Name == serverName {
+				targetServer = &cfg.Servers[i]
+				break
+			}
+		}
+
+		if targetServer == nil {
+			color.Red("Error: Server '%s' not found", serverName)
+			os.Exit(1)
+		}
+
+		fmt.Printf("\nChecking server: %s (%s)\n\n", targetServer.Name, targetServer.IP)
+
+		// Test SSH connectivity
+		fmt.Print("SSH connectivity... ")
+		if err := utils.TestSSHConnection(*targetServer); err != nil {
+			color.Red("FAILED")
+			color.Red("  %v", err)
+			os.Exit(1)
+		}
+		color.Green("OK")
+
+		fmt.Println()
+		color.Green("✓ Server '%s' is healthy", serverName)
+	},
+}
+
+// serverUpdateCmd represents the server update command
+var serverUpdateCmd = &cobra.Command{
+	Use:   "update [name]",
+	Short: "Update server configuration",
+	Long: `Update the configuration for an existing server.
+
+Examples:
+  # Update a specific server
+  wordsail server update myserver
+
+  # Interactively select a server to update
+  wordsail server update`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		mgr, err := config.NewManager()
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		if !mgr.ConfigExists() {
+			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			os.Exit(1)
+		}
+
+		cfg, err := mgr.Load()
+		if err != nil {
+			color.Red("Error: Failed to load configuration: %v", err)
+			os.Exit(1)
+		}
+
+		if len(cfg.Servers) == 0 {
+			fmt.Println("No servers configured.")
+			return
+		}
+
+		var serverName string
+
+		if len(args) == 0 {
+			// Interactive mode
+			options := make([]string, len(cfg.Servers))
+			for i, server := range cfg.Servers {
+				options[i] = fmt.Sprintf("%s (%s)", server.Name, server.IP)
+			}
+
+			var selected int
+			selectPrompt := &survey.Select{
+				Message: "Select a server to update:",
+				Options: options,
+			}
+			if err := survey.AskOne(selectPrompt, &selected); err != nil {
+				os.Exit(1)
+			}
+			serverName = cfg.Servers[selected].Name
+		} else {
+			serverName = args[0]
+		}
+
+		// Find server index
+		var serverIndex int = -1
+		for i := range cfg.Servers {
+			if cfg.Servers[i].Name == serverName {
+				serverIndex = i
+				break
+			}
+		}
+
+		if serverIndex == -1 {
+			color.Red("Error: Server '%s' not found", serverName)
+			os.Exit(1)
+		}
+
+		server := &cfg.Servers[serverIndex]
+
+		fmt.Printf("\nUpdating server: %s\n", server.Name)
+		fmt.Println("Leave blank to keep current value.")
+
+		// Update fields interactively
+		var newName string
+		namePrompt := &survey.Input{
+			Message: "Server name:",
+			Default: server.Name,
+		}
+		if err := survey.AskOne(namePrompt, &newName); err != nil {
+			os.Exit(1)
+		}
+
+		// Check for duplicate name
+		if newName != server.Name {
+			for _, s := range cfg.Servers {
+				if s.Name == newName {
+					color.Red("Error: Server with name '%s' already exists", newName)
+					os.Exit(1)
+				}
+			}
+		}
+
+		var newIP string
+		ipPrompt := &survey.Input{
+			Message: "IP address:",
+			Default: server.IP,
+		}
+		if err := survey.AskOne(ipPrompt, &newIP, survey.WithValidator(utils.ValidateIP)); err != nil {
+			os.Exit(1)
+		}
+
+		var newSSHUser string
+		userPrompt := &survey.Input{
+			Message: "SSH user:",
+			Default: server.SSH.User,
+		}
+		if err := survey.AskOne(userPrompt, &newSSHUser); err != nil {
+			os.Exit(1)
+		}
+
+		var newSSHKey string
+		keyPrompt := &survey.Input{
+			Message: "SSH key file:",
+			Default: server.SSH.KeyFile,
+		}
+		if err := survey.AskOne(keyPrompt, &newSSHKey); err != nil {
+			os.Exit(1)
+		}
+
+		var newSSHPort string
+		portPrompt := &survey.Input{
+			Message: "SSH port:",
+			Default: fmt.Sprintf("%d", server.SSH.Port),
+		}
+		if err := survey.AskOne(portPrompt, &newSSHPort); err != nil {
+			os.Exit(1)
+		}
+		var port int
+		fmt.Sscanf(newSSHPort, "%d", &port)
+		if port == 0 {
+			port = 22
+		}
+
+		// Show summary and confirm
+		fmt.Println()
+		fmt.Println("Updated configuration:")
+		fmt.Printf("  Name:     %s\n", newName)
+		fmt.Printf("  IP:       %s\n", newIP)
+		fmt.Printf("  SSH User: %s\n", newSSHUser)
+		fmt.Printf("  SSH Key:  %s\n", newSSHKey)
+		fmt.Printf("  SSH Port: %d\n", port)
+		fmt.Println()
+
+		var confirm bool
+		if err := survey.AskOne(&survey.Confirm{
+			Message: "Save changes?",
+			Default: true,
+		}, &confirm); err != nil {
+			os.Exit(1)
+		}
+
+		if !confirm {
+			fmt.Println("Update cancelled")
+			return
+		}
+
+		// Apply changes
+		server.Name = newName
+		server.Hostname = newIP
+		server.IP = newIP
+		server.SSH.User = newSSHUser
+		server.SSH.KeyFile = newSSHKey
+		server.SSH.Port = port
+
+		// Save config
+		if err := mgr.Save(cfg); err != nil {
+			color.Red("Error: Failed to save configuration: %v", err)
+			os.Exit(1)
+		}
+
+		color.Green("✓ Server '%s' updated successfully", newName)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(serverCmd)
 	serverCmd.AddCommand(serverAddCmd)
 	serverCmd.AddCommand(serverListCmd)
 	serverCmd.AddCommand(serverRemoveCmd)
 	serverCmd.AddCommand(serverProvisionCmd)
+	serverCmd.AddCommand(serverHealthCheckCmd)
+	serverCmd.AddCommand(serverUpdateCmd)
 
-	// Flags
+	// server add flags (non-interactive mode)
+	serverAddCmd.Flags().String("name", "", "Server name")
+	serverAddCmd.Flags().String("ip", "", "Server IP address")
+	serverAddCmd.Flags().String("ssh-key", "", "Path to SSH private key")
+	serverAddCmd.Flags().String("ssh-user", "root", "SSH user")
+	serverAddCmd.Flags().Int("ssh-port", 22, "SSH port")
+	serverAddCmd.Flags().Bool("json", false, "Output in JSON format")
+
+	// server list flags
+	serverListCmd.Flags().Bool("json", false, "Output in JSON format")
+
+	// server remove flags
 	serverRemoveCmd.Flags().BoolP("force", "f", false, "Force removal without confirmation")
+	serverRemoveCmd.Flags().Bool("json", false, "Output in JSON format")
+
+	// server provision flags
+	serverProvisionCmd.Flags().String("name", "", "Server name (for non-interactive mode)")
+	serverProvisionCmd.Flags().String("ip", "", "Server IP address")
+	serverProvisionCmd.Flags().String("ssh-key", "", "Path to SSH private key")
+	serverProvisionCmd.Flags().String("ssh-user", "root", "SSH user")
+	serverProvisionCmd.Flags().Int("ssh-port", 22, "SSH port")
 	serverProvisionCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
 	serverProvisionCmd.Flags().Bool("skip-ssh-check", false, "Skip SSH connectivity check")
 	serverProvisionCmd.Flags().Bool("skip-check", false, "Skip already-provisioned check")
+	serverProvisionCmd.Flags().Bool("json", false, "Output in JSON format")
+
+	// server health-check flags
+	serverHealthCheckCmd.Flags().Bool("json", false, "Output in JSON format")
+
+	// server update flags
+	serverUpdateCmd.Flags().String("name", "", "New server name")
+	serverUpdateCmd.Flags().String("ip", "", "New IP address")
+	serverUpdateCmd.Flags().String("ssh-key", "", "New SSH private key path")
+	serverUpdateCmd.Flags().String("ssh-user", "", "New SSH user")
+	serverUpdateCmd.Flags().Int("ssh-port", 0, "New SSH port")
+	serverUpdateCmd.Flags().Bool("json", false, "Output in JSON format")
 }

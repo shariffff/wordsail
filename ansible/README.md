@@ -97,7 +97,6 @@ ansible-playbook playbooks/delete_site.yml -i "IP," -u wordsail \
 | `wp_admin_user` | WordPress admin username | `admin` |
 | `wp_admin_email` | WordPress admin email | `admin@example.com` |
 | `wp_admin_password` | WordPress admin password | `SecurePass123` |
-| `free_site` | Mark as free site (optional) | `false` |
 
 ## Server Directory Structure
 

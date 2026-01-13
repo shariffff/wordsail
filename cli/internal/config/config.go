@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/wordsail/cli/internal/installer"
 	"github.com/wordsail/cli/pkg/models"
 )
 
@@ -31,10 +32,17 @@ type Config struct {
 
 // DefaultConfig returns a new Config with sensible defaults
 func DefaultConfig() *Config {
+	// Detect ansible path dynamically
+	ansiblePath, err := installer.GetAnsiblePath()
+	if err != nil {
+		// Fallback to user's wordsail directory
+		ansiblePath = installer.GetAnsibleDir()
+	}
+
 	return &Config{
 		Version: "1.0",
 		Ansible: AnsibleConfig{
-			Path:              "/Users/sharif/Projects/ansible",
+			Path:              ansiblePath,
 			RolesPath:         "./roles",
 			InventoryPath:     "/tmp/wordsail-inventory-{timestamp}.ini",
 			PythonInterpreter: "/usr/bin/python3",

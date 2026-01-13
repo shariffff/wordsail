@@ -9,7 +9,7 @@ WordSail provides a complete solution for deploying and managing WordPress sites
 - 🚀 **One-command server provisioning** - Full LEMP stack setup (Nginx, PHP 8.3, MariaDB)
 - 🔒 **Security hardened** - UFW firewall, Fail2ban, SSH hardening, automatic SSL with Let's Encrypt
 - 🎯 **Isolated WordPress sites** - Each site runs under its own user with dedicated PHP-FPM pool
-- 🛠️ **Intuitive CLI** - Interactive prompts for all operations (server, site, domain management)
+- 🛠️ **Dual-mode CLI** - Interactive prompts for manual operations, script mode with flags for automation
 - 🔄 **Infrastructure as code** - All configuration reproducible via Ansible
 
 ## Quick Start
@@ -30,6 +30,7 @@ wordsail init
 
 ### Usage
 
+**Interactive Mode** (guided prompts):
 ```bash
 # Add and provision a server
 wordsail server add
@@ -45,6 +46,24 @@ wordsail domain ssl
 # List everything
 wordsail server list
 wordsail site list
+```
+
+**Script Mode** (non-interactive with flags):
+```bash
+# Create a site with all parameters
+wordsail site create --non-interactive \
+  --server production-1 \
+  --domain example.com \
+  --system-name examplecom \
+  --admin-user admin \
+  --admin-email admin@example.com \
+  --admin-password SecurePass123!
+
+# Delete a site without confirmation
+wordsail site delete --server production-1 --site examplecom --force
+
+# Provision server with options
+wordsail server provision production-1 --force --skip-ssh-check
 ```
 
 ## Project Structure
@@ -69,6 +88,7 @@ wordsail/
 - **Language**: Go 1.21+
 - **Framework**: Cobra (commands), Survey (interactive prompts)
 - **Config**: YAML-based state management
+- **Operating Modes**: Interactive (prompts) and Script (flags for automation)
 
 ### Infrastructure
 
@@ -152,6 +172,50 @@ apt install wordsail
 3. **Ansible configures servers** - Idempotent playbooks ensure consistent state
 4. **CLI updates state** - After successful operations, configuration is updated
 
+## CLI Modes
+
+WordSail CLI supports two operating modes to fit different workflows:
+
+### Interactive Mode
+
+Perfect for manual operations and learning the tool. The CLI prompts you for all required information with helpful hints and validation.
+
+```bash
+wordsail site create
+# Prompts for: server, domain, system name, admin credentials
+```
+
+**Benefits:**
+- User-friendly with guided prompts
+- Built-in validation and helpful hints
+- Easy discovery of available options
+- Great for manual operations
+
+### Script Mode (Non-Interactive)
+
+Ideal for automation, CI/CD pipelines, and scripting. Provide all parameters as command-line flags.
+
+```bash
+wordsail site create --non-interactive \
+  --server production-1 \
+  --domain example.com \
+  --system-name examplecom \
+  --admin-user admin \
+  --admin-email admin@example.com \
+  --admin-password SecurePass123!
+```
+
+**Benefits:**
+- Fully scriptable and automatable
+- No user interaction required
+- Perfect for CI/CD pipelines
+- Consistent and reproducible operations
+
+**Available flags:**
+- `--non-interactive`: Disable all prompts (required for script mode)
+- `--force`: Skip confirmation prompts
+- `--skip-ssh-check`: Skip SSH connectivity validation
+
 ## Common Workflows
 
 ### New Server Setup
@@ -177,6 +241,25 @@ wordsail domain ssl           # Issue SSL certificate
 wordsail site list            # View all sites
 wordsail domain add           # Add domain to site
 wordsail site delete          # Remove site completely
+```
+
+### Automated Deployment (Script Mode)
+
+```bash
+# Fully automated site deployment
+wordsail site create --non-interactive \
+  --server production-1 \
+  --domain example.com \
+  --system-name examplecom \
+  --admin-user admin \
+  --admin-email admin@example.com \
+  --admin-password "${WP_ADMIN_PASSWORD}"
+
+# Automated site cleanup
+wordsail site delete \
+  --server production-1 \
+  --site examplecom \
+  --force
 ```
 
 ## Roadmap

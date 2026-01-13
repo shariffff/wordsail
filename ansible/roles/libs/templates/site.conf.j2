@@ -7,14 +7,8 @@ server {
 
 	server_name {{ domain }}; # {{ ansible_managed }}
 
-{% if free_site is defined and free_site | bool %}
-    ssl_certificate /etc/ssl/cloudflare/origin.crt; # {{ ansible_managed }}
-    ssl_certificate_key /etc/ssl/cloudflare/origin.key; # {{ ansible_managed }}
-{% else %}
     # ssl_certificate {{ ansible_managed }}
     # ssl_certificate_key {{ ansible_managed }}
-{% endif %}
-
 
 	root /sites/{{ domain }}/files/;
 

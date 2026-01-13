@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -25,9 +26,10 @@ var siteCmd = &cobra.Command{
 
 // siteCreateCmd represents the site create command
 var siteCreateCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a new WordPress site",
-	Long:  `Interactively create a new WordPress site on a provisioned server.`,
+	Use:     "create",
+	Aliases: []string{"add"},
+	Short:   "Create a new WordPress site",
+	Long:    `Interactively create a new WordPress site on a provisioned server.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
@@ -58,7 +60,6 @@ var siteCreateCmd = &cobra.Command{
 			adminUser, _ := cmd.Flags().GetString("admin-user")
 			adminEmail, _ := cmd.Flags().GetString("admin-email")
 			adminPassword, _ := cmd.Flags().GetString("admin-password")
-			freeSite, _ := cmd.Flags().GetBool("free-site")
 
 			if serverName == "" || domain == "" || systemName == "" || adminUser == "" || adminEmail == "" || adminPassword == "" {
 				color.Red("Error: In non-interactive mode, all flags are required")
@@ -73,7 +74,6 @@ var siteCreateCmd = &cobra.Command{
 				AdminUser:     adminUser,
 				AdminEmail:    adminEmail,
 				AdminPassword: adminPassword,
-				FreeSite:      freeSite,
 			}
 		} else {
 			// Interactive prompts
@@ -106,16 +106,17 @@ var siteCreateCmd = &cobra.Command{
 
 		// Prepare extra vars for Ansible
 		extraVars := map[string]interface{}{
-			"domain":           input.Domain,
-			"system_name":      input.SystemName,
-			"wp_admin_user":    input.AdminUser,
-			"wp_admin_email":   input.AdminEmail,
+			"domain":            input.Domain,
+			"system_name":       input.SystemName,
+			"wp_admin_user":     input.AdminUser,
+			"wp_admin_email":    input.AdminEmail,
 			"wp_admin_password": input.AdminPassword,
-			"free_site":        input.FreeSite,
 		}
 
 		// Create Ansible executor
 		executor := ansible.NewExecutor(cfg.Ansible.Path)
+		executor.SetVerbose(Verbose)
+		executor.SetDryRun(DryRun)
 
 		// Execute website.yml playbook
 		fmt.Println()
@@ -150,7 +151,6 @@ var siteCreateCmd = &cobra.Command{
 			},
 			PHPVersion: "8.3",
 			Metadata: models.Metadata{
-				FreeSite:      input.FreeSite,
 				BackupEnabled: false,
 			},
 		}
@@ -175,6 +175,12 @@ var siteCreateCmd = &cobra.Command{
 		fmt.Printf("  1. Add www subdomain: wordsail domain add\n")
 		fmt.Printf("  2. Issue SSL certificate: wordsail domain ssl\n")
 	},
+}
+
+// SiteWithServer represents a site with its server name for JSON output
+type SiteWithServer struct {
+	ServerName string       `json:"server_name"`
+	Site       models.Site  `json:"site"`
 }
 
 // siteListCmd represents the site list command
@@ -202,6 +208,30 @@ var siteListCmd = &cobra.Command{
 
 		// Filter by server if specified
 		filterServer, _ := cmd.Flags().GetString("server")
+
+		// Check for JSON output
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+		if jsonOutput {
+			sites := make([]SiteWithServer, 0)
+			for _, server := range cfg.Servers {
+				if filterServer != "" && server.Name != filterServer {
+					continue
+				}
+				for _, site := range server.Sites {
+					sites = append(sites, SiteWithServer{
+						ServerName: server.Name,
+						Site:       site,
+					})
+				}
+			}
+			output, err := json.MarshalIndent(sites, "", "  ")
+			if err != nil {
+				color.Red("Error: Failed to marshal JSON: %v", err)
+				os.Exit(1)
+			}
+			fmt.Println(string(output))
+			return
+		}
 
 		// Count total sites
 		totalSites := 0
@@ -263,9 +293,10 @@ var siteListCmd = &cobra.Command{
 
 // siteDeleteCmd represents the site delete command
 var siteDeleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete a WordPress site",
-	Long:  `Delete a WordPress site and all its associated files and databases.`,
+	Use:     "delete",
+	Aliases: []string{"remove"},
+	Short:   "Delete a WordPress site",
+	Long:    `Delete a WordPress site and all its associated files and databases.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
@@ -408,6 +439,8 @@ var siteDeleteCmd = &cobra.Command{
 
 		// Create Ansible executor
 		executor := ansible.NewExecutor(cfg.Ansible.Path)
+		executor.SetVerbose(Verbose)
+		executor.SetDryRun(DryRun)
 
 		// Execute delete_site tasks
 		fmt.Println()
@@ -449,13 +482,17 @@ func init() {
 	siteCreateCmd.Flags().String("admin-user", "", "WordPress admin username")
 	siteCreateCmd.Flags().String("admin-email", "", "WordPress admin email")
 	siteCreateCmd.Flags().String("admin-password", "", "WordPress admin password")
-	siteCreateCmd.Flags().Bool("free-site", false, "Mark as free site")
+
+	// site create json flag
+	siteCreateCmd.Flags().Bool("json", false, "Output in JSON format")
 
 	// site list flags
 	siteListCmd.Flags().String("server", "", "Filter by server name")
+	siteListCmd.Flags().Bool("json", false, "Output in JSON format")
 
 	// site delete flags
 	siteDeleteCmd.Flags().String("server", "", "Server name")
 	siteDeleteCmd.Flags().String("site", "", "Site system name")
 	siteDeleteCmd.Flags().BoolP("force", "f", false, "Force deletion without confirmation")
+	siteDeleteCmd.Flags().Bool("json", false, "Output in JSON format")
 }

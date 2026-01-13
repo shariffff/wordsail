@@ -16,8 +16,10 @@ import (
 
 // Executor handles Ansible playbook execution
 type Executor struct {
-	ansiblePath string
+	ansiblePath  string
 	invGenerator *InventoryGenerator
+	verbose      bool
+	dryRun       bool
 }
 
 // NewExecutor creates a new Ansible executor
@@ -25,7 +27,19 @@ func NewExecutor(ansiblePath string) *Executor {
 	return &Executor{
 		ansiblePath:  ansiblePath,
 		invGenerator: NewInventoryGenerator(),
+		verbose:      false,
+		dryRun:       false,
 	}
+}
+
+// SetVerbose enables or disables verbose output
+func (e *Executor) SetVerbose(verbose bool) {
+	e.verbose = verbose
+}
+
+// SetDryRun enables or disables dry-run mode (--check in Ansible)
+func (e *Executor) SetDryRun(dryRun bool) {
+	e.dryRun = dryRun
 }
 
 // ExecutePlaybook runs an ansible-playbook command with the given parameters
@@ -59,6 +73,16 @@ func (e *Executor) ExecutePlaybook(playbookName string, server models.Server, ex
 	args := []string{
 		playbookPath,
 		"-i", inventoryPath,
+	}
+
+	// Add verbose flag if enabled
+	if e.verbose {
+		args = append(args, "-vv")
+	}
+
+	// Add dry-run flag if enabled
+	if e.dryRun {
+		args = append(args, "--check")
 	}
 
 	// Add extra vars if provided

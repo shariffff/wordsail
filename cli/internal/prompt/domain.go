@@ -2,9 +2,9 @@ package prompt
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/wordsail/cli/internal/utils"
 	"github.com/wordsail/cli/pkg/models"
 )
 
@@ -82,7 +82,7 @@ func PromptDomainAdd(servers []models.Server) (*DomainAddInput, error) {
 		Message: "Domain name to add:",
 		Help:    "Enter the domain (e.g., www.example.com)",
 	}
-	if err := survey.AskOne(domainPrompt, &input.Domain, survey.WithValidator(survey.Required), survey.WithValidator(validateDomain)); err != nil {
+	if err := survey.AskOne(domainPrompt, &input.Domain, survey.WithValidator(survey.Required), survey.WithValidator(utils.ValidateDomain)); err != nil {
 		return nil, err
 	}
 
@@ -254,25 +254,10 @@ func PromptDomainSSL(servers []models.Server, defaultEmail string) (*DomainSSLIn
 		Default: defaultEmail,
 		Help:    "Email address for certificate expiration notices",
 	}
-	if err := survey.AskOne(emailPrompt, &input.CertbotEmail, survey.WithValidator(survey.Required), survey.WithValidator(validateEmail)); err != nil {
+	if err := survey.AskOne(emailPrompt, &input.CertbotEmail, survey.WithValidator(survey.Required), survey.WithValidator(utils.ValidateEmail)); err != nil {
 		return nil, err
 	}
 
 	return input, nil
 }
 
-// validateDomainFormat validates domain format
-func validateDomainFormat(val interface{}) error {
-	domain, ok := val.(string)
-	if !ok {
-		return fmt.Errorf("invalid domain type")
-	}
-
-	// Basic domain validation
-	domainRegex := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`)
-	if !domainRegex.MatchString(domain) {
-		return fmt.Errorf("invalid domain format (e.g., example.com)")
-	}
-
-	return nil
-}

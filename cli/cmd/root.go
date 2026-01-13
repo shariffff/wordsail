@@ -12,6 +12,10 @@ var (
 	Version   = "dev"
 	CommitSHA = "unknown"
 	BuildDate = "unknown"
+
+	// Global flags
+	Verbose bool
+	DryRun  bool
 )
 
 // rootCmd represents the base command
@@ -22,7 +26,23 @@ var rootCmd = &cobra.Command{
 by wrapping Ansible playbooks with an intuitive, interactive interface.
 
 Manage servers, sites, and domains with ease while maintaining full
-visibility into your infrastructure state via ~/.wordsail/servers.yaml`,
+visibility into your infrastructure state via ~/.wordsail/servers.yaml
+
+Examples:
+  # Initialize configuration
+  wordsail config init
+
+  # Add and provision a new server
+  wordsail server provision
+
+  # Create a WordPress site
+  wordsail site create
+
+  # Add a domain with SSL
+  wordsail domain add
+
+  # List all servers
+  wordsail server list --json`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately
@@ -34,6 +54,7 @@ func Execute() {
 }
 
 func init() {
-	// Global flags can be added here
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.wordsail/servers.yaml)")
+	// Global flags
+	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.PersistentFlags().BoolVar(&DryRun, "dry-run", false, "Show what would be done without making changes")
 }

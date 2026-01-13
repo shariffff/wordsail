@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/wordsail/cli/internal/utils"
 	"github.com/wordsail/cli/pkg/models"
 )
 
@@ -19,7 +20,6 @@ type SiteInput struct {
 	AdminUser     string
 	AdminEmail    string
 	AdminPassword string
-	FreeSite      bool
 }
 
 // PromptSiteCreate prompts for site creation details
@@ -64,7 +64,7 @@ func PromptSiteCreate(servers []models.Server) (*SiteInput, error) {
 		Message: "Primary domain name:",
 		Help:    "The main domain for this WordPress site (e.g., example.com)",
 	}
-	if err := survey.AskOne(domainPrompt, &input.Domain, survey.WithValidator(survey.Required), survey.WithValidator(validateDomain)); err != nil {
+	if err := survey.AskOne(domainPrompt, &input.Domain, survey.WithValidator(survey.Required), survey.WithValidator(utils.ValidateDomain)); err != nil {
 		return nil, err
 	}
 
@@ -75,7 +75,7 @@ func PromptSiteCreate(servers []models.Server) (*SiteInput, error) {
 		Help:    "Linux user for this site (alphanumeric only, 3-16 chars)",
 		Default: defaultSystemName,
 	}
-	if err := survey.AskOne(systemNamePrompt, &input.SystemName, survey.WithValidator(survey.Required), survey.WithValidator(validateSystemName)); err != nil {
+	if err := survey.AskOne(systemNamePrompt, &input.SystemName, survey.WithValidator(survey.Required), survey.WithValidator(utils.ValidateSystemName)); err != nil {
 		return nil, err
 	}
 
@@ -102,7 +102,7 @@ func PromptSiteCreate(servers []models.Server) (*SiteInput, error) {
 		Message: "WordPress admin email:",
 		Help:    "Email address for WordPress admin account",
 	}
-	if err := survey.AskOne(adminEmailPrompt, &input.AdminEmail, survey.WithValidator(survey.Required), survey.WithValidator(validateEmail)); err != nil {
+	if err := survey.AskOne(adminEmailPrompt, &input.AdminEmail, survey.WithValidator(survey.Required), survey.WithValidator(utils.ValidateEmail)); err != nil {
 		return nil, err
 	}
 
@@ -138,24 +138,14 @@ func PromptSiteCreate(servers []models.Server) (*SiteInput, error) {
 	} else {
 		passwordPrompt := &survey.Password{
 			Message: "WordPress admin password:",
-			Help:    "Minimum 12 characters recommended",
+			Help:    "Min 12 chars with uppercase, lowercase, number, and special character",
 		}
-		if err := survey.AskOne(passwordPrompt, &input.AdminPassword, survey.WithValidator(survey.Required), survey.WithValidator(validatePasswordStrength)); err != nil {
+		if err := survey.AskOne(passwordPrompt, &input.AdminPassword, survey.WithValidator(survey.Required), survey.WithValidator(utils.ValidatePasswordStrength)); err != nil {
 			return nil, err
 		}
 	}
 
-	// 7. Free site flag
-	freeSitePrompt := &survey.Confirm{
-		Message: "Mark as free site?",
-		Default: false,
-		Help:    "Free sites may have different resource limits or management",
-	}
-	if err := survey.AskOne(freeSitePrompt, &input.FreeSite); err != nil {
-		return nil, err
-	}
-
-	// 8. Confirmation
+	// 7. Confirmation
 	if err := confirmSiteCreation(input); err != nil {
 		return nil, err
 	}
@@ -174,7 +164,6 @@ func confirmSiteCreation(input *SiteInput) error {
 	fmt.Printf("  System Name:  %s\n", input.SystemName)
 	fmt.Printf("  Admin User:   %s\n", input.AdminUser)
 	fmt.Printf("  Admin Email:  %s\n", input.AdminEmail)
-	fmt.Printf("  Free Site:    %v\n", input.FreeSite)
 	fmt.Println("═══════════════════════════════════════════════════")
 	fmt.Println()
 
@@ -190,69 +179,6 @@ func confirmSiteCreation(input *SiteInput) error {
 
 	if !confirm {
 		return fmt.Errorf("site creation cancelled")
-	}
-
-	return nil
-}
-
-// Validators
-
-func validateDomain(val interface{}) error {
-	domain, ok := val.(string)
-	if !ok {
-		return fmt.Errorf("invalid domain type")
-	}
-
-	// Basic domain validation
-	domainRegex := regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$`)
-	if !domainRegex.MatchString(domain) {
-		return fmt.Errorf("invalid domain format (e.g., example.com)")
-	}
-
-	return nil
-}
-
-func validateSystemName(val interface{}) error {
-	name, ok := val.(string)
-	if !ok {
-		return fmt.Errorf("invalid system name type")
-	}
-
-	// Alphanumeric only, 3-16 characters
-	if len(name) < 3 || len(name) > 16 {
-		return fmt.Errorf("system name must be 3-16 characters")
-	}
-
-	alphanumRegex := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
-	if !alphanumRegex.MatchString(name) {
-		return fmt.Errorf("system name must be alphanumeric only")
-	}
-
-	return nil
-}
-
-func validateEmail(val interface{}) error {
-	email, ok := val.(string)
-	if !ok {
-		return fmt.Errorf("invalid email type")
-	}
-
-	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
-	if !emailRegex.MatchString(email) {
-		return fmt.Errorf("invalid email format")
-	}
-
-	return nil
-}
-
-func validatePasswordStrength(val interface{}) error {
-	password, ok := val.(string)
-	if !ok {
-		return fmt.Errorf("invalid password type")
-	}
-
-	if len(password) < 12 {
-		return fmt.Errorf("password must be at least 12 characters")
 	}
 
 	return nil

@@ -7,7 +7,6 @@
   # Base variables (safe defaults)
   vars:
     db_host: localhost
-    free_site: false
 
   # Compute dynamic variables after --extra-vars are loaded
   pre_tasks:
