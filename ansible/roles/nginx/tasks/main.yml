@@ -36,6 +36,13 @@
     mode: "0644"
   notify: restart nginx
 
+- name: Ensure fastcgi.conf exists
+  template:
+    src: fastcgi.conf.j2
+    dest: /etc/nginx/fastcgi.conf
+    mode: "0644"
+  notify: restart nginx
+
 - name: Create global directory
   file:
     path: /etc/nginx/global
