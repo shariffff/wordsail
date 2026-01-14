@@ -84,7 +84,7 @@ ansible-playbook playbooks/delete_site.yml -i "IP," -u wordsail \
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `wordsail_ssh_key` | SSH public key for wordsail user | Yes |
+| `wordsail_ssh_key` | SSH public key for wordsail user (file path or key content) | Yes |
 | `mysql_wordsailbot_password` | MySQL admin password | Yes |
 | `certbot_email` | Email for Let's Encrypt | Yes |
 

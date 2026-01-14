@@ -11,9 +11,11 @@
 certbot_email: "your-email@example.com"
 
 # Your SSH public key for the wordsail user
+# Can be either:
+#   1. File path: "~/.ssh/id_ed25519.pub" or "/path/to/key.pub"
+#   2. Key content: "ssh-ed25519 AAAA... your-key-comment"
 # Generate with: ssh-keygen -t ed25519 -C "wordsail"
-# Then paste the contents of ~/.ssh/id_ed25519.pub here
-wordsail_ssh_key: "ssh-ed25519 AAAA... your-key-comment"
+wordsail_ssh_key: "~/.ssh/id_ed25519.pub"
 
 # Password for the wordsailbot MySQL user (used for database management)
 # Generate a strong password (minimum 24 characters recommended)

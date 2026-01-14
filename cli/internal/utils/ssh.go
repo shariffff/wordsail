@@ -37,19 +37,15 @@ func TestSSHConnection(server models.Server) error {
 		return fmt.Errorf("failed to parse SSH private key: %w", err)
 	}
 
-	// Configure SSH client with host key verification
-	hostKeyCallback, err := getHostKeyCallback()
-	if err != nil {
-		// Fall back to trusting on first use if known_hosts doesn't exist
-		hostKeyCallback = trustOnFirstUseCallback()
-	}
-
+	// Configure SSH client with TOFU host key verification
+	// This validates against known_hosts if the file exists and the host is known,
+	// or automatically accepts and saves unknown host keys
 	config := &ssh.ClientConfig{
 		User: server.SSH.User,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
-		HostKeyCallback: hostKeyCallback,
+		HostKeyCallback: trustOnFirstUseCallback(),
 		Timeout:         10 * time.Second,
 	}
 
@@ -112,9 +108,13 @@ func trustOnFirstUseCallback() ssh.HostKeyCallback {
 			if err == nil {
 				return nil // Key is known and matches
 			}
-			// If it's a key mismatch error, return it
-			if _, ok := err.(*knownhosts.KeyError); ok {
-				return fmt.Errorf("host key mismatch for %s - possible security issue", hostname)
+			// Check if it's a KeyError (unknown host or key mismatch)
+			if keyErr, ok := err.(*knownhosts.KeyError); ok {
+				// If Want is not empty, it means we expected different keys (mismatch)
+				if len(keyErr.Want) > 0 {
+					return fmt.Errorf("host key mismatch for %s - possible security issue", hostname)
+				}
+				// Want is empty, so host is unknown - fall through to add it
 			}
 		}
 

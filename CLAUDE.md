@@ -235,7 +235,7 @@ Set in `ansible/group_vars/all.yml` or pass via `--extra-vars`:
 
 | Variable | Description |
 |----------|-------------|
-| `wordsail_ssh_key` | SSH public key for wordsail user |
+| `wordsail_ssh_key` | SSH public key for wordsail user (file path or key content) |
 | `mysql_wordsailbot_password` | MySQL admin password |
 | `certbot_email` | Email for Let's Encrypt |
 

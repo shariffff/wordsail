@@ -22,7 +22,7 @@
 - name: Set up authorized key for wordsail
   ansible.posix.authorized_key:
     user: wordsail
-    key: "{{ wordsail_ssh_key }}"
+    key: "{{ lookup('file', wordsail_ssh_key) if wordsail_ssh_key is match('.*\\.(pub|pem)$') or wordsail_ssh_key.startswith('~') or wordsail_ssh_key.startswith('/') else wordsail_ssh_key }}"
     state: present
     manage_dir: true
 
