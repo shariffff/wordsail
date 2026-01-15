@@ -8,11 +8,22 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/fatih/color"
 	"github.com/wordsail/cli/pkg/models"
 )
+
+// ExecutionResult holds the parsed results from Ansible output
+type ExecutionResult struct {
+	Ok      int
+	Changed int
+	Failed  int
+}
 
 // Executor handles Ansible playbook execution
 type Executor struct {
@@ -20,6 +31,7 @@ type Executor struct {
 	invGenerator *InventoryGenerator
 	verbose      bool
 	dryRun       bool
+	spinner      *spinner.Spinner
 }
 
 // NewExecutor creates a new Ansible executor
@@ -75,7 +87,7 @@ func (e *Executor) ExecutePlaybook(playbookName string, server models.Server, ex
 		"-i", inventoryPath,
 	}
 
-	// Add verbose flag if enabled
+	// Add verbose flag if enabled (only for ansible, not our spinner mode)
 	if e.verbose {
 		args = append(args, "-vv")
 	}
@@ -112,38 +124,177 @@ func (e *Executor) ExecutePlaybook(playbookName string, server models.Server, ex
 		return fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
-	// Start the command
-	fmt.Printf("\n")
-	color.Cyan("Running: ansible-playbook %s", strings.Join(args, " "))
-	fmt.Printf("\n")
+	// Use spinner mode (quiet) by default, verbose mode shows full output
+	if e.verbose {
+		// Verbose mode: show full Ansible output
+		fmt.Printf("\n")
+		color.Cyan("Running: ansible-playbook %s", strings.Join(args, " "))
+		fmt.Printf("\n")
+
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("failed to start ansible-playbook: %w", err)
+		}
+
+		done := make(chan bool)
+		go func() {
+			e.streamOutput(stdout, false)
+			done <- true
+		}()
+		go func() {
+			e.streamOutput(stderr, true)
+		}()
+		<-done
+
+		if err := cmd.Wait(); err != nil {
+			return fmt.Errorf("ansible-playbook failed: %w", err)
+		}
+		return nil
+	}
+
+	// Spinner mode (default): show spinner with current task
+	return e.executeWithSpinner(cmd, stdout, stderr)
+}
+
+// executeWithSpinner runs the command with a spinner showing current task
+func (e *Executor) executeWithSpinner(cmd *exec.Cmd, stdout, stderr io.ReadCloser) error {
+	// Initialize spinner
+	e.spinner = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	e.spinner.Suffix = " Starting..."
+	e.spinner.Start()
 
 	if err := cmd.Start(); err != nil {
+		e.spinner.Stop()
 		return fmt.Errorf("failed to start ansible-playbook: %w", err)
 	}
 
-	// Stream output in real-time
-	done := make(chan bool)
+	// Buffers to store output
+	var outputBuffer []string
+	var errorBuffer []string
+	var result ExecutionResult
+	var currentTask string
+	var failed bool
+	var mu sync.Mutex
 
-	// Stream stdout
+	// Regex patterns
+	taskPattern := regexp.MustCompile(`^TASK \[(.+?)\]`)
+	playPattern := regexp.MustCompile(`^PLAY \[(.+?)\]`)
+	recapPattern := regexp.MustCompile(`ok=(\d+)\s+changed=(\d+).*failed=(\d+)`)
+	failedPattern := regexp.MustCompile(`(?i)(FAILED|fatal:)`)
+
+	done := make(chan bool, 2)
+
+	// Process stdout
 	go func() {
-		e.streamOutput(stdout, false)
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			mu.Lock()
+			outputBuffer = append(outputBuffer, line)
+
+			// Check for task name
+			if matches := taskPattern.FindStringSubmatch(line); len(matches) > 1 {
+				currentTask = matches[1]
+				e.spinner.Suffix = " " + currentTask
+			} else if matches := playPattern.FindStringSubmatch(line); len(matches) > 1 {
+				e.spinner.Suffix = " " + matches[1]
+			}
+
+			// Check for failures
+			if failedPattern.MatchString(line) {
+				failed = true
+			}
+
+			// Parse recap
+			if matches := recapPattern.FindStringSubmatch(line); len(matches) > 3 {
+				fmt.Sscanf(matches[1], "%d", &result.Ok)
+				fmt.Sscanf(matches[2], "%d", &result.Changed)
+				fmt.Sscanf(matches[3], "%d", &result.Failed)
+			}
+			mu.Unlock()
+		}
 		done <- true
 	}()
 
-	// Stream stderr
+	// Process stderr
 	go func() {
-		e.streamOutput(stderr, true)
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			mu.Lock()
+			errorBuffer = append(errorBuffer, line)
+			if failedPattern.MatchString(line) {
+				failed = true
+			}
+			mu.Unlock()
+		}
+		done <- true
 	}()
 
-	// Wait for stdout streaming to complete
+	// Wait for both streams
+	<-done
 	<-done
 
 	// Wait for command to finish
-	if err := cmd.Wait(); err != nil {
-		return fmt.Errorf("ansible-playbook failed: %w", err)
+	cmdErr := cmd.Wait()
+	e.spinner.Stop()
+
+	// Show results
+	if cmdErr != nil || failed || result.Failed > 0 {
+		// Show failure
+		color.Red("✗ Task failed: %s\n", currentTask)
+		fmt.Println()
+
+		// Show relevant error output (last 20 lines or lines containing errors)
+		mu.Lock()
+		e.printErrorContext(outputBuffer, errorBuffer)
+		mu.Unlock()
+
+		fmt.Println()
+		color.Red("Failed: %d ok, %d changed, %d failed", result.Ok, result.Changed, result.Failed)
+		if cmdErr != nil {
+			return fmt.Errorf("ansible-playbook failed")
+		}
+		return fmt.Errorf("playbook completed with failures")
 	}
 
+	// Show success
+	color.Green("✓ Completed: %d ok, %d changed, %d failed", result.Ok, result.Changed, result.Failed)
 	return nil
+}
+
+// printErrorContext prints relevant lines from the output when an error occurs
+func (e *Executor) printErrorContext(outputBuffer, errorBuffer []string) {
+	// Print stderr if any
+	for _, line := range errorBuffer {
+		color.Red(line)
+	}
+
+	// Find and print lines around the failure
+	failedPattern := regexp.MustCompile(`(?i)(FAILED|fatal:|TASK \[)`)
+	inErrorContext := false
+	contextLines := 0
+	maxContextLines := 15
+
+	for _, line := range outputBuffer {
+		if failedPattern.MatchString(line) {
+			inErrorContext = true
+			contextLines = 0
+		}
+
+		if inErrorContext {
+			if strings.Contains(line, "FAILED") || strings.Contains(line, "fatal:") {
+				color.Red(line)
+			} else if strings.Contains(line, "TASK [") {
+				color.Cyan(line)
+			} else {
+				fmt.Println(line)
+			}
+			contextLines++
+			if contextLines > maxContextLines && !strings.Contains(line, "fatal:") && !strings.Contains(line, "FAILED") {
+				inErrorContext = false
+			}
+		}
+	}
 }
 
 // streamOutput reads and prints output with color coding

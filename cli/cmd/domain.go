@@ -193,30 +193,57 @@ var domainRemoveCmd = &cobra.Command{
 	Use:     "remove",
 	Aliases: []string{"delete"},
 	Short:   "Remove a domain from a site",
-	Long:    `Remove a domain from a WordPress site and its Nginx configuration.`,
+	Long: `Remove a domain from a WordPress site and its Nginx configuration.
+
+Examples:
+  # Interactive mode
+  wordsail domain remove
+
+  # Non-interactive mode (for automation/AI agents)
+  wordsail domain remove --server myserver --site mysite --domain www.example.com --force`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
-			color.Red("Error: %v", err)
+			outputError(cmd, "Failed to create config manager", err)
 			os.Exit(1)
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
 			os.Exit(1)
 		}
 
 		cfg, err := mgr.Load()
 		if err != nil {
-			color.Red("Error: Failed to load configuration: %v", err)
+			outputError(cmd, "Failed to load configuration", err)
 			os.Exit(1)
 		}
 
-		// Get input from prompts
-		input, err := prompt.PromptDomainRemove(cfg.Servers)
-		if err != nil {
-			color.Red("Error: %v", err)
+		var input *prompt.DomainRemoveInput
+
+		// Check for non-interactive mode
+		serverName, _ := cmd.Flags().GetString("server")
+		siteName, _ := cmd.Flags().GetString("site")
+		domain, _ := cmd.Flags().GetString("domain")
+
+		if serverName != "" && siteName != "" && domain != "" {
+			// Non-interactive mode
+			input = &prompt.DomainRemoveInput{
+				ServerName: serverName,
+				SystemName: siteName,
+				Domain:     domain,
+			}
+		} else if serverName != "" || siteName != "" || domain != "" {
+			outputError(cmd, "Incomplete flags", fmt.Errorf("--server, --site, and --domain are all required for non-interactive mode"))
 			os.Exit(1)
+		} else {
+			// Interactive mode - get input from prompts
+			var err error
+			input, err = prompt.PromptDomainRemove(cfg.Servers)
+			if err != nil {
+				outputError(cmd, "Failed to get domain details", err)
+				os.Exit(1)
+			}
 		}
 
 		// Find the target server
@@ -293,22 +320,29 @@ var domainRemoveCmd = &cobra.Command{
 var domainSSLCmd = &cobra.Command{
 	Use:   "ssl",
 	Short: "Issue SSL certificate for a domain",
-	Long:  `Obtain a Let's Encrypt SSL certificate for a domain.`,
+	Long: `Obtain a Let's Encrypt SSL certificate for a domain.
+
+Examples:
+  # Interactive mode
+  wordsail domain ssl
+
+  # Non-interactive mode (for automation/AI agents)
+  wordsail domain ssl --server myserver --site mysite --domain www.example.com --email admin@example.com`,
 	Run: func(cmd *cobra.Command, args []string) {
 		mgr, err := config.NewManager()
 		if err != nil {
-			color.Red("Error: %v", err)
+			outputError(cmd, "Failed to create config manager", err)
 			os.Exit(1)
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
 			os.Exit(1)
 		}
 
 		cfg, err := mgr.Load()
 		if err != nil {
-			color.Red("Error: Failed to load configuration: %v", err)
+			outputError(cmd, "Failed to load configuration", err)
 			os.Exit(1)
 		}
 
@@ -318,11 +352,36 @@ var domainSSLCmd = &cobra.Command{
 			defaultEmail = email
 		}
 
-		// Get input from prompts
-		input, err := prompt.PromptDomainSSL(cfg.Servers, defaultEmail)
-		if err != nil {
-			color.Red("Error: %v", err)
+		var input *prompt.DomainSSLInput
+
+		// Check for non-interactive mode
+		serverName, _ := cmd.Flags().GetString("server")
+		siteName, _ := cmd.Flags().GetString("site")
+		domain, _ := cmd.Flags().GetString("domain")
+
+		if serverName != "" && siteName != "" && domain != "" {
+			// Non-interactive mode
+			email, _ := cmd.Flags().GetString("email")
+			if email == "" {
+				email = defaultEmail
+			}
+			input = &prompt.DomainSSLInput{
+				ServerName:   serverName,
+				SystemName:   siteName,
+				Domain:       domain,
+				CertbotEmail: email,
+			}
+		} else if serverName != "" || siteName != "" || domain != "" {
+			outputError(cmd, "Incomplete flags", fmt.Errorf("--server, --site, and --domain are all required for non-interactive mode"))
 			os.Exit(1)
+		} else {
+			// Interactive mode - get input from prompts
+			var err error
+			input, err = prompt.PromptDomainSSL(cfg.Servers, defaultEmail)
+			if err != nil {
+				outputError(cmd, "Failed to get SSL details", err)
+				os.Exit(1)
+			}
 		}
 
 		// Find the target server
