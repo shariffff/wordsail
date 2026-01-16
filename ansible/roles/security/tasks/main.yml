@@ -1,4 +1,8 @@
 ---
+# Security Role Tasks
+# Configures UFW firewall and SSH hardening
+# Variables defined in roles/security/defaults/main.yml
+
 - name: Install UFW
   ansible.builtin.apt:
     name: ufw
@@ -9,22 +13,23 @@
     name: ufw
     state: started
 
+# Configure firewall rules based on ufw_allowed_ports variable
+# Default allows SSH (22), HTTP (80), and HTTPS (443)
 - name: Configure UFW rules
   community.general.ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
-  with_items:
-    - 22
-    - 80
-    - 443
+  with_items: "{{ ufw_allowed_ports }}"
 
-- name: Enable UFW
+- name: Enable UFW with default {{ ufw_default_policy }} policy
   community.general.ufw:
     state: enabled
-    policy: deny
+    policy: "{{ ufw_default_policy }}"
 
-- name: Configure SSH
+# SSH hardening configuration
+# Settings defined in roles/security/defaults/main.yml
+- name: Configure SSH hardening
   ansible.builtin.template:
     src: 00-wordsail.conf.j2
     dest: /etc/ssh/sshd_config.d/00-wordsail.conf

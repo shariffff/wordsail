@@ -2,6 +2,7 @@
 # Emergency server cleanup task
 # Use this to clean up failed provisioning attempts
 # Usage: ansible-playbook cleanup.yml or include in rescue blocks
+# Variables defined in roles/libs/defaults/main.yml
 
 - name: "Cleanup - Remove all Ondrej PPA configurations"
   ansible.builtin.file:
@@ -30,7 +31,7 @@
     enabled: false
   with_items:
     - nginx
-    - php8.3-fpm
+    - "php{{ php_version }}-fpm"
     - mysql
     - mariadb
   ignore_errors: true
@@ -42,7 +43,7 @@
     purge: true
   with_items:
     - nginx*
-    - php8.3*
+    - "php{{ php_version }}*"
     - mariadb-server*
   when: force_cleanup is defined and force_cleanup == true
   ignore_errors: true
@@ -63,12 +64,4 @@
 
 - name: "Cleanup - Display cleanup completion"
   ansible.builtin.debug:
-    msg: |-
-      🧹 Server cleanup completed
-
-      Removed:
-      - Ondrej PPA repositories
-      - GPG keys and temporary files
-      - Service configurations (stopped services)
-
-      Note: Use force_cleanup=true to remove packages completely
+    msg: "Server cleanup completed. Removed PPA repositories, GPG keys, and stopped services. Use force_cleanup=true to remove packages completely."

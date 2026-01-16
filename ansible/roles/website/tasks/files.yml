@@ -25,7 +25,7 @@
 
 - name: Symlink PHP binary
   ansible.builtin.file:
-    src: /usr/bin/php8.3
+    src: "/usr/bin/php{{ php_version }}"
     dest: "{{ site_home }}/.local/bin/php"
     state: link
     owner: "{{ site_user }}"

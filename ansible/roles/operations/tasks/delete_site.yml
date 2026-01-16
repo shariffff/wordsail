@@ -1,8 +1,13 @@
 ---
+# Delete Site Playbook
+# Removes a WordPress site and all associated resources
+# Required variables: system_name, site_domain, db_host
+
 - name: Deprovision Website
   hosts: all:!localhost
   become: true
   vars:
+    php_version: "8.3"
     db_name: "{{ system_name }}"
     db_user: "{{ system_name }}"
     db_pass: "{{ lookup('password', '/dev/null', length=32) }}"
@@ -10,7 +15,7 @@
     site_group: "{{ system_name }}"
     site_home: "/home/{{ site_user }}"
   tasks:
-    - name: Remove cron job
+    - name: Remove cron job for {{ site_domain }}
       ansible.builtin.cron:
         name: "{{ site_domain }}"
         state: absent
@@ -20,7 +25,7 @@
         path: "{{ site_home }}/files"
         state: absent
 
-    - name: Drop MySQL database
+    - name: Drop MySQL database {{ db_name }}
       community.mysql.mysql_db:
         name: "{{ db_name }}"
         state: absent
@@ -28,7 +33,7 @@
         login_port: "{{ db_host.split(':')[1] | default('3306') }}"
         config_file: /home/wordsail/.my.cnf
 
-    - name: Drop MySQL user
+    - name: Drop MySQL user {{ db_user }}
       community.mysql.mysql_user:
         name: "{{ db_user }}"
         state: absent
@@ -49,17 +54,17 @@
 
     - name: Remove PHP-FPM pool configuration
       ansible.builtin.file:
-        path: "/etc/php/8.3/fpm/pool.d/{{ system_name }}.conf"
+        path: "/etc/php/{{ php_version }}/fpm/pool.d/{{ system_name }}.conf"
         state: absent
       notify: Reload php-fpm
 
-    - name: Remove site user
+    - name: Remove site user {{ site_user }}
       ansible.builtin.user:
         name: "{{ site_user }}"
         state: absent
         remove: true
 
-    - name: Remove site group
+    - name: Remove site group {{ site_group }}
       ansible.builtin.group:
         name: "{{ site_group }}"
         state: absent
@@ -72,5 +77,5 @@
 
     - name: Reload php-fpm
       ansible.builtin.service:
-        name: php8.3-fpm
+        name: "php{{ php_version }}-fpm"
         state: reloaded

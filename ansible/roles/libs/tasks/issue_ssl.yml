@@ -161,14 +161,25 @@
     cmd: nginx -t
   changed_when: false
   tags: issue_ssl
-# - name: Update WordPress home URL
-#   command:
-#     cmd: wp option update home 'http://{{domain}}'
-#     chdir: /sites/{{domain}}/files
-#   changed_when: false
 
-# - name: Update WordPress site URL
-#   command:
-#     cmd: wp option update siteurl 'http://{{domain}}'
-#     chdir: /sites/{{domain}}/files
-#   changed_when: false
+# Update WordPress URLs to use HTTPS after SSL certificate is issued
+# Uses WP-CLI to update both home and siteurl options
+- name: Update WordPress home URL to HTTPS
+  ansible.builtin.command:
+    cmd: wp option update home 'https://{{ domain }}'
+    chdir: /sites/{{ domain }}/files
+  become: true
+  become_user: "{{ system_name }}"
+  changed_when: true
+  tags: issue_ssl
+  when: system_name is defined
+
+- name: Update WordPress site URL to HTTPS
+  ansible.builtin.command:
+    cmd: wp option update siteurl 'https://{{ domain }}'
+    chdir: /sites/{{ domain }}/files
+  become: true
+  become_user: "{{ system_name }}"
+  changed_when: true
+  tags: issue_ssl
+  when: system_name is defined

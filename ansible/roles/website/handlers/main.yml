@@ -6,5 +6,5 @@
 
 - name: Reload php-fpm
   ansible.builtin.systemd:
-    name: php8.3-fpm
+    name: "php{{ php_version }}-fpm"
     state: reloaded
