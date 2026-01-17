@@ -23,11 +23,12 @@ type BackupConfig struct {
 
 // Config represents the main configuration file structure
 type Config struct {
-	Version    string                 `yaml:"version" validate:"required"`
-	Ansible    AnsibleConfig          `yaml:"ansible"`
-	GlobalVars map[string]interface{} `yaml:"global_vars"`
-	Servers    []models.Server        `yaml:"servers"`
-	Backup     BackupConfig           `yaml:"backup,omitempty"`
+	Version         string                 `yaml:"version" validate:"required"`
+	Ansible         AnsibleConfig          `yaml:"ansible"`
+	GlobalVars      map[string]interface{} `yaml:"global_vars"`
+	Servers         []models.Server        `yaml:"servers"`
+	Backup          BackupConfig           `yaml:"backup,omitempty"`
+	PreferredEditor string                 `yaml:"preferred_editor,omitempty"`
 }
 
 // DefaultConfig returns a new Config with sensible defaults
@@ -48,9 +49,8 @@ func DefaultConfig() *Config {
 			PythonInterpreter: "/usr/bin/python3",
 		},
 		GlobalVars: map[string]interface{}{
-			"certbot_email":              "admin@example.com",
-			"mysql_wordsailbot_password": "${MYSQL_WORDSAILBOT_PASSWORD}",
-			"wordsail_ssh_key":           "~/.ssh/wordsail_rsa.pub",
+			"certbot_email":    "admin@example.com",
+			"wordsail_ssh_key": "~/.ssh/wordsail_rsa.pub",
 		},
 		Servers: []models.Server{},
 		Backup: BackupConfig{

@@ -542,6 +542,32 @@ Examples:
 			}
 		}
 
+		// Generate MySQL password for this server if not already set
+		mysqlPassword := targetServer.Credentials.MySQLWordsailbotPassword
+		if mysqlPassword == "" {
+			mysqlPassword = prompt.GenerateSecurePassword(24)
+			targetServer.Credentials.MySQLWordsailbotPassword = mysqlPassword
+
+			// Update server in config with the new password
+			for i := range cfg.Servers {
+				if cfg.Servers[i].Name == serverName {
+					cfg.Servers[i].Credentials.MySQLWordsailbotPassword = mysqlPassword
+					break
+				}
+			}
+			if err := mgr.Save(cfg); err != nil {
+				outputError(cmd, "Failed to save MySQL password to config", err)
+				os.Exit(1)
+			}
+		}
+
+		// Create a copy of global vars and add the server-specific MySQL password
+		provisionVars := make(map[string]interface{})
+		for k, v := range cfg.GlobalVars {
+			provisionVars[k] = v
+		}
+		provisionVars["mysql_wordsailbot_password"] = mysqlPassword
+
 		// Create Ansible executor
 		executor := ansible.NewExecutor(cfg.Ansible.Path)
 		executor.SetVerbose(Verbose)
@@ -554,7 +580,7 @@ Examples:
 		color.Cyan("═══════════════════════════════════════════════════════")
 		fmt.Println()
 
-		if err := executor.ExecutePlaybook("provision.yml", *targetServer, nil, cfg.GlobalVars); err != nil {
+		if err := executor.ExecutePlaybook("provision.yml", *targetServer, nil, provisionVars); err != nil {
 			color.Red("\n✗ Provisioning failed: %v", err)
 
 			// Mark server as error
@@ -574,6 +600,11 @@ Examples:
 		color.Green("═══════════════════════════════════════════════════════")
 		color.Green("  ✓ Server '%s' provisioned successfully!", serverName)
 		color.Green("═══════════════════════════════════════════════════════")
+		fmt.Println()
+		fmt.Println("Server credentials:")
+		fmt.Printf("  MySQL wordsailbot password: %s\n", mysqlPassword)
+		fmt.Println()
+		color.Yellow("  Save this password! It's stored in your config file.")
 		fmt.Println()
 		fmt.Println("Next steps:")
 		fmt.Println("  Create a WordPress site: wordsail site create")

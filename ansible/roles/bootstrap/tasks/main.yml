@@ -1,6 +1,6 @@
 ---
 - name: Setup WordSail user
-  ansible.builtin.import_tasks: roles/bootstrap/tasks/wordsail-user.yml
+  ansible.builtin.import_tasks: wordsail-user.yml
 
 - name: Update apt cache
   ansible.builtin.apt:

@@ -3,10 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/wordsail/cli/internal/config"
+	"github.com/wordsail/cli/internal/prompt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -149,9 +151,63 @@ var configValidateCmd = &cobra.Command{
 	},
 }
 
+// configEditCmd represents the config edit command
+var configEditCmd = &cobra.Command{
+	Use:   "edit",
+	Short: "Edit configuration file in your preferred editor",
+	Long:  `Open the wordsail configuration file in your preferred editor. On first run, you'll be prompted to select an editor.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		mgr, err := config.NewManager()
+		if err != nil {
+			color.Red("Error: %v", err)
+			os.Exit(1)
+		}
+
+		if !mgr.ConfigExists() {
+			color.Red("Configuration file not found at: %s", mgr.GetConfigPath())
+			fmt.Println("Run 'wordsail config init' to create it.")
+			os.Exit(1)
+		}
+
+		cfg, err := mgr.Load()
+		if err != nil {
+			color.Red("Error: Failed to load configuration: %v", err)
+			os.Exit(1)
+		}
+
+		// If no preferred editor is set, prompt for one
+		if cfg.PreferredEditor == "" {
+			editor, err := prompt.PromptEditorSelection()
+			if err != nil {
+				color.Red("Error: %v", err)
+				os.Exit(1)
+			}
+
+			cfg.PreferredEditor = editor
+			if err := mgr.Save(cfg); err != nil {
+				color.Red("Error: Failed to save editor preference: %v", err)
+				os.Exit(1)
+			}
+			color.Green("Saved editor preference: %s", editor)
+		}
+
+		// Open the config file in the preferred editor
+		editorCmd := exec.Command(cfg.PreferredEditor, mgr.GetConfigPath())
+		editorCmd.Stdin = os.Stdin
+		editorCmd.Stdout = os.Stdout
+		editorCmd.Stderr = os.Stderr
+
+		if err := editorCmd.Run(); err != nil {
+			color.Red("Error: Failed to open editor: %v", err)
+			os.Exit(1)
+		}
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.AddCommand(configInitCmd)
 	configCmd.AddCommand(configShowCmd)
 	configCmd.AddCommand(configValidateCmd)
+	configCmd.AddCommand(configEditCmd)
 }

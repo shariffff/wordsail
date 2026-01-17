@@ -103,7 +103,7 @@ func PromptSiteCreate(servers []models.Server) (*SiteInput, error) {
 	}
 
 	if useGeneratedPassword {
-		input.AdminPassword = generateSecurePassword(20)
+		input.AdminPassword = GenerateSecurePassword(20)
 		fmt.Printf("\n")
 		fmt.Printf("Generated password: %s\n", input.AdminPassword)
 		fmt.Printf("⚠️  IMPORTANT: Save this password securely!\n")
@@ -234,7 +234,8 @@ func GenerateSiteID(domain string, existingSites []models.Site) string {
 	return generateUniqueSiteID(domain, existingSites)
 }
 
-func generateSecurePassword(length int) string {
+// GenerateSecurePassword generates a cryptographically secure random password
+func GenerateSecurePassword(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
 	password := make([]byte, length)
 

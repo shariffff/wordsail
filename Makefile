@@ -1,4 +1,6 @@
-.PHONY: all build install install-user test test-cli test-ansible clean fmt lint help
+.PHONY: all build install install-user test test-cli test-ansible test-full clean fmt lint help \
+       molecule-install test-molecule test-molecule-provision test-molecule-website test-molecule-roles \
+       lint-yaml lint-ansible
 
 # Version from version.txt
 VERSION=$(shell cat version.txt)
@@ -69,23 +71,84 @@ clean:
 run: build
 	@./cli/wordsail
 
+# ===== Molecule Testing =====
+
+# Install Molecule and dependencies
+molecule-install:
+	@echo "Installing Molecule and dependencies..."
+	pip install molecule molecule-plugins[docker] ansible-lint yamllint
+	@echo "✓ Molecule installation complete"
+
+# Run all Molecule tests (roles + integration)
+test-molecule: test-molecule-roles test-molecule-provision test-molecule-website
+	@echo "✓ All Molecule tests passed"
+
+# Run individual role tests
+test-molecule-roles:
+	@echo "Running Molecule tests for all roles..."
+	@cd ansible/roles/bootstrap && molecule test
+	@cd ansible/roles/database && molecule test
+	@cd ansible/roles/nginx && molecule test
+	@cd ansible/roles/php && molecule test
+	@cd ansible/roles/security && molecule test
+	@echo "✓ All role tests passed"
+
+# Run provision integration test
+test-molecule-provision:
+	@echo "Running provision integration test..."
+	@cd ansible && molecule test -s provision
+	@echo "✓ Provision integration test passed"
+
+# Run website integration test
+test-molecule-website:
+	@echo "Running website integration test..."
+	@cd ansible && molecule test -s website
+	@echo "✓ Website integration test passed"
+
+# Lint YAML files
+lint-yaml:
+	@echo "Linting YAML files..."
+	@cd ansible && yamllint .
+	@echo "✓ YAML lint passed"
+
+# Lint Ansible files
+lint-ansible:
+	@echo "Linting Ansible files..."
+	@cd ansible && ansible-lint
+	@echo "✓ Ansible lint passed"
+
+# Full test suite (CLI + Ansible syntax + Molecule)
+test-full: test lint-yaml lint-ansible test-molecule
+	@echo "✓ Full test suite passed"
+
 # Show help
 help:
 	@echo "WordSail Build System"
 	@echo "Version: $(VERSION)"
 	@echo ""
 	@echo "Available targets:"
-	@echo "  build        - Build the CLI binary"
-	@echo "  install      - Install CLI to /usr/local/bin (requires sudo)"
-	@echo "  install-user - Install CLI to ~/bin (no sudo required)"
-	@echo "  test         - Run all tests (CLI + Ansible)"
-	@echo "  test-cli     - Run CLI tests only"
-	@echo "  test-ansible - Validate Ansible playbook syntax"
-	@echo "  fmt          - Format Go code"
-	@echo "  lint         - Lint Go code"
-	@echo "  clean        - Remove build artifacts"
-	@echo "  run          - Build and run CLI"
-	@echo "  help         - Show this help message"
+	@echo "  build                   - Build the CLI binary"
+	@echo "  install                 - Install CLI to /usr/local/bin (requires sudo)"
+	@echo "  install-user            - Install CLI to ~/bin (no sudo required)"
+	@echo "  test                    - Run all tests (CLI + Ansible syntax)"
+	@echo "  test-cli                - Run CLI tests only"
+	@echo "  test-ansible            - Validate Ansible playbook syntax"
+	@echo "  fmt                     - Format Go code"
+	@echo "  lint                    - Lint Go code"
+	@echo "  clean                   - Remove build artifacts"
+	@echo "  run                     - Build and run CLI"
+	@echo ""
+	@echo "Molecule Testing:"
+	@echo "  molecule-install        - Install Molecule and dependencies"
+	@echo "  test-molecule           - Run all Molecule tests"
+	@echo "  test-molecule-roles     - Run individual role tests"
+	@echo "  test-molecule-provision - Run provision integration test"
+	@echo "  test-molecule-website   - Run website integration test"
+	@echo "  lint-yaml               - Lint YAML files"
+	@echo "  lint-ansible            - Lint Ansible files"
+	@echo "  test-full               - Run full test suite (CLI + lint + Molecule)"
+	@echo ""
+	@echo "  help                    - Show this help message"
 	@echo ""
 	@echo "Quick start:"
 	@echo "  make build && ./cli/wordsail init"

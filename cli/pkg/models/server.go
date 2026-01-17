@@ -9,13 +9,19 @@ type SSHConfig struct {
 	KeyFile string `yaml:"key_file" validate:"required"`
 }
 
+// ServerCredentials holds server-specific credentials
+type ServerCredentials struct {
+	MySQLWordsailbotPassword string `yaml:"mysql_wordsailbot_password,omitempty"`
+}
+
 // Server represents a managed server
 type Server struct {
-	Name          string     `yaml:"name" validate:"required"`
-	Hostname      string     `yaml:"hostname" validate:"required"`
-	IP            string     `yaml:"ip" validate:"required,ip"`
-	SSH           SSHConfig  `yaml:"ssh"`
-	Status        string     `yaml:"status" validate:"oneof=provisioned unprovisioned error"`
-	ProvisionedAt *time.Time `yaml:"provisioned_at,omitempty"`
-	Sites         []Site     `yaml:"sites,omitempty"`
+	Name          string             `yaml:"name" validate:"required"`
+	Hostname      string             `yaml:"hostname" validate:"required"`
+	IP            string             `yaml:"ip" validate:"required,ip"`
+	SSH           SSHConfig          `yaml:"ssh"`
+	Credentials   ServerCredentials  `yaml:"credentials,omitempty"`
+	Status        string             `yaml:"status" validate:"oneof=provisioned unprovisioned error"`
+	ProvisionedAt *time.Time         `yaml:"provisioned_at,omitempty"`
+	Sites         []Site             `yaml:"sites,omitempty"`
 }
