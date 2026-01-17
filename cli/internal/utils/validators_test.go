@@ -36,7 +36,7 @@ func TestValidateDomain(t *testing.T) {
 	}
 }
 
-func TestValidateSystemName(t *testing.T) {
+func TestValidateSiteID(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   interface{}
@@ -57,9 +57,9 @@ func TestValidateSystemName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateSystemName(tt.input)
+			err := ValidateSiteID(tt.input)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateSystemName() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ValidateSiteID() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

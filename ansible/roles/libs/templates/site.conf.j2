@@ -49,7 +49,7 @@ server {
 		try_files $uri =404;
 
 		include fastcgi.conf;
-		fastcgi_pass unix:/run/php/php{{ php_version }}-{{ system_name }}.sock;
+		fastcgi_pass unix:/run/php/php{{ php_version }}-{{ site_id }}.sock;
 
 		include sites-available/{{ domain }}/location/*; # {{ ansible_managed }}
 	}

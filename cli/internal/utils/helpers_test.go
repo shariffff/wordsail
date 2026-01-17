@@ -70,19 +70,19 @@ func TestFindServerIndexByName(t *testing.T) {
 	}
 }
 
-func TestFindSiteBySystemName(t *testing.T) {
+func TestFindSiteBySiteID(t *testing.T) {
 	server := &models.Server{
 		Name: "testserver",
 		Sites: []models.Site{
-			{SystemName: "site1", PrimaryDomain: "site1.com"},
-			{SystemName: "site2", PrimaryDomain: "site2.com"},
+			{SiteID: "site1", PrimaryDomain: "site1.com"},
+			{SiteID: "site2", PrimaryDomain: "site2.com"},
 		},
 	}
 
 	tests := []struct {
 		name       string
 		server     *models.Server
-		systemName string
+		siteID     string
 		wantNil    bool
 		wantDomain string
 	}{
@@ -94,33 +94,33 @@ func TestFindSiteBySystemName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FindSiteBySystemName(tt.server, tt.systemName)
+			result := FindSiteBySiteID(tt.server, tt.siteID)
 			if tt.wantNil && result != nil {
-				t.Errorf("FindSiteBySystemName() = %v, want nil", result)
+				t.Errorf("FindSiteBySiteID() = %v, want nil", result)
 			}
 			if !tt.wantNil && result == nil {
-				t.Errorf("FindSiteBySystemName() = nil, want site")
+				t.Errorf("FindSiteBySiteID() = nil, want site")
 			}
 			if !tt.wantNil && result != nil && result.PrimaryDomain != tt.wantDomain {
-				t.Errorf("FindSiteBySystemName() domain = %v, want %v", result.PrimaryDomain, tt.wantDomain)
+				t.Errorf("FindSiteBySiteID() domain = %v, want %v", result.PrimaryDomain, tt.wantDomain)
 			}
 		})
 	}
 }
 
-func TestFindSiteIndexBySystemName(t *testing.T) {
+func TestFindSiteIndexBySiteID(t *testing.T) {
 	server := &models.Server{
 		Sites: []models.Site{
-			{SystemName: "site1"},
-			{SystemName: "site2"},
+			{SiteID: "site1"},
+			{SiteID: "site2"},
 		},
 	}
 
 	tests := []struct {
-		name       string
-		server     *models.Server
-		systemName string
-		wantIndex  int
+		name      string
+		server    *models.Server
+		siteID    string
+		wantIndex int
 	}{
 		{"find first", server, "site1", 0},
 		{"find second", server, "site2", 1},
@@ -130,9 +130,9 @@ func TestFindSiteIndexBySystemName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := FindSiteIndexBySystemName(tt.server, tt.systemName)
+			result := FindSiteIndexBySiteID(tt.server, tt.siteID)
 			if result != tt.wantIndex {
-				t.Errorf("FindSiteIndexBySystemName() = %v, want %v", result, tt.wantIndex)
+				t.Errorf("FindSiteIndexBySiteID() = %v, want %v", result, tt.wantIndex)
 			}
 		})
 	}
@@ -142,7 +142,7 @@ func TestFindSiteByDomain(t *testing.T) {
 	server := &models.Server{
 		Sites: []models.Site{
 			{
-				SystemName:    "site1",
+				SiteID:        "site1",
 				PrimaryDomain: "primary.com",
 				Domains: []models.Domain{
 					{Domain: "primary.com"},
@@ -150,7 +150,7 @@ func TestFindSiteByDomain(t *testing.T) {
 				},
 			},
 			{
-				SystemName:    "site2",
+				SiteID:        "site2",
 				PrimaryDomain: "other.com",
 				Domains: []models.Domain{
 					{Domain: "other.com"},
@@ -160,11 +160,11 @@ func TestFindSiteByDomain(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		server         *models.Server
-		domain         string
-		wantNil        bool
-		wantSystemName string
+		name       string
+		server     *models.Server
+		domain     string
+		wantNil    bool
+		wantSiteID string
 	}{
 		{"find by primary domain", server, "primary.com", false, "site1"},
 		{"find by additional domain", server, "www.primary.com", false, "site1"},
@@ -182,8 +182,8 @@ func TestFindSiteByDomain(t *testing.T) {
 			if !tt.wantNil && result == nil {
 				t.Errorf("FindSiteByDomain() = nil, want site")
 			}
-			if !tt.wantNil && result != nil && result.SystemName != tt.wantSystemName {
-				t.Errorf("FindSiteByDomain() systemName = %v, want %v", result.SystemName, tt.wantSystemName)
+			if !tt.wantNil && result != nil && result.SiteID != tt.wantSiteID {
+				t.Errorf("FindSiteByDomain() siteID = %v, want %v", result.SiteID, tt.wantSiteID)
 			}
 		})
 	}
@@ -239,16 +239,16 @@ func TestServerExists(t *testing.T) {
 func TestSiteExists(t *testing.T) {
 	server := &models.Server{
 		Sites: []models.Site{
-			{SystemName: "site1"},
-			{SystemName: "site2"},
+			{SiteID: "site1"},
+			{SiteID: "site2"},
 		},
 	}
 
 	tests := []struct {
-		name       string
-		server     *models.Server
-		systemName string
-		want       bool
+		name   string
+		server *models.Server
+		siteID string
+		want   bool
 	}{
 		{"exists", server, "site1", true},
 		{"exists 2", server, "site2", true},
@@ -258,9 +258,93 @@ func TestSiteExists(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := SiteExists(tt.server, tt.systemName)
+			result := SiteExists(tt.server, tt.siteID)
 			if result != tt.want {
 				t.Errorf("SiteExists() = %v, want %v", result, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseSSLExpiry(t *testing.T) {
+	tests := []struct {
+		name      string
+		input     string
+		wantNil   bool
+		wantYear  int
+		wantMonth int
+		wantDay   int
+	}{
+		{
+			name:      "standard openssl format",
+			input:     "Mar 15 12:00:00 2024 GMT",
+			wantNil:   false,
+			wantYear:  2024,
+			wantMonth: 3,
+			wantDay:   15,
+		},
+		{
+			name:      "single digit day",
+			input:     "Jan 5 08:30:00 2025 GMT",
+			wantNil:   false,
+			wantYear:  2025,
+			wantMonth: 1,
+			wantDay:   5,
+		},
+		{
+			name:      "padded single digit day",
+			input:     "Jan  5 08:30:00 2025 GMT",
+			wantNil:   false,
+			wantYear:  2025,
+			wantMonth: 1,
+			wantDay:   5,
+		},
+		{
+			name:      "double digit day",
+			input:     "Dec 25 23:59:59 2026 GMT",
+			wantNil:   false,
+			wantYear:  2026,
+			wantMonth: 12,
+			wantDay:   25,
+		},
+		{
+			name:    "invalid format",
+			input:   "2024-03-15",
+			wantNil: true,
+		},
+		{
+			name:    "empty string",
+			input:   "",
+			wantNil: true,
+		},
+		{
+			name:    "garbage input",
+			input:   "not a date at all",
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ParseSSLExpiry(tt.input)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("ParseSSLExpiry(%q) = %v, want nil", tt.input, result)
+				}
+				return
+			}
+			if result == nil {
+				t.Errorf("ParseSSLExpiry(%q) = nil, want non-nil", tt.input)
+				return
+			}
+			if result.Year() != tt.wantYear {
+				t.Errorf("ParseSSLExpiry(%q) year = %d, want %d", tt.input, result.Year(), tt.wantYear)
+			}
+			if int(result.Month()) != tt.wantMonth {
+				t.Errorf("ParseSSLExpiry(%q) month = %d, want %d", tt.input, result.Month(), tt.wantMonth)
+			}
+			if result.Day() != tt.wantDay {
+				t.Errorf("ParseSSLExpiry(%q) day = %d, want %d", tt.input, result.Day(), tt.wantDay)
 			}
 		})
 	}

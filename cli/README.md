@@ -99,7 +99,8 @@ When you run commands without flags, the CLI guides you through the process with
 
 ```bash
 wordsail site create
-# Prompts you for: server, domain, system name, admin credentials
+# Prompts you for: server, domain, admin credentials
+# (site ID is auto-generated from domain)
 ```
 
 **Use interactive mode when:**
@@ -116,10 +117,10 @@ Provide all parameters as command-line flags for fully automated operations.
 wordsail site create --non-interactive \
   --server production-1 \
   --domain example.com \
-  --system-name examplecom \
   --admin-user admin \
   --admin-email admin@example.com \
   --admin-password SecurePass123!
+# --site-id is optional (auto-generated from domain if not provided)
 ```
 
 **Use script mode when:**
@@ -174,11 +175,19 @@ wordsail server provision <name> --skip-ssh-check     # Skip SSH connectivity te
 # Create a new WordPress site (interactive)
 wordsail site create
 
-# Create a site non-interactively
+# Create a site non-interactively (site-id auto-generated)
 wordsail site create --non-interactive \
   --server production-1 \
   --domain example.com \
-  --system-name examplecom \
+  --admin-user admin \
+  --admin-email admin@example.com \
+  --admin-password SecurePass123!
+
+# Create with explicit site-id
+wordsail site create --non-interactive \
+  --server production-1 \
+  --domain example.com \
+  --site-id mysite \
   --admin-user admin \
   --admin-email admin@example.com \
   --admin-password SecurePass123!
@@ -192,11 +201,11 @@ wordsail site list --server production-1
 # Delete a site (interactive selection)
 wordsail site delete
 
-# Delete a specific site
-wordsail site delete --server production-1 --site examplecom
+# Delete a specific site (by site ID)
+wordsail site delete --server production-1 --site mysiteid
 
 # Force delete without confirmation
-wordsail site delete --server production-1 --site examplecom --force
+wordsail site delete --server production-1 --site mysiteid --force
 ```
 
 ### Domain Management

@@ -1,12 +1,20 @@
 ---
-- name: Add Nginx APT key
-  ansible.builtin.apt_key:
-    url: "https://nginx.org/keys/nginx_signing.key"
-    state: present
+- name: Create apt keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
 
-- name: Add Nginx PPA
-  apt_repository:
-    repo: "{{ nginx_ppa }}"
+- name: Download Nginx signing key
+  ansible.builtin.get_url:
+    url: https://nginx.org/keys/nginx_signing.key
+    dest: /etc/apt/keyrings/nginx.asc
+    mode: "0644"
+
+- name: Add Nginx repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/nginx.asc] {{ nginx_repo_url }}"
+    state: present
     update_cache: true
   register: result
   until: result is success

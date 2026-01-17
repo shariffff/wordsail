@@ -4,6 +4,7 @@
   ansible.builtin.command: wp core download
   args:
     chdir: "{{ site_home }}/files"
+    creates: "{{ site_home }}/files/wp-includes/version.php"
 
 - name: Create wp-config.php
   become_user: "{{ site_user }}"
@@ -17,7 +18,16 @@
     --dbcharset=utf8mb4
   args:
     chdir: "{{ site_home }}/files"
-  ignore_errors: true
+    creates: "{{ site_home }}/files/wp-config.php"
+
+- name: Check if WordPress is installed
+  become_user: "{{ site_user }}"
+  ansible.builtin.command: wp core is-installed
+  args:
+    chdir: "{{ site_home }}/files"
+  register: wp_installed
+  failed_when: false
+  changed_when: false
 
 - name: Install WordPress
   become_user: "{{ site_user }}"
@@ -31,18 +41,27 @@
     --skip-email
   args:
     chdir: "{{ site_home }}/files"
-  ignore_errors: true
+  when: wp_installed.rc != 0
+
+- name: Get current permalink structure
+  become_user: "{{ site_user }}"
+  ansible.builtin.command: wp option get permalink_structure
+  args:
+    chdir: "{{ site_home }}/files"
+  register: current_permalink
+  changed_when: false
+  failed_when: false
 
 - name: Set permalink structure
-  ansible.builtin.command: wp rewrite structure '/%postname%/'
   become_user: "{{ site_user }}"
+  ansible.builtin.command: wp rewrite structure '/%postname%/'
   args:
     chdir: "{{ site_home }}/files"
-  ignore_errors: true
+  when: current_permalink.stdout != '/%postname%/'
 
 - name: Flush cache
-  ansible.builtin.command: wp cache flush
   become_user: "{{ site_user }}"
+  ansible.builtin.command: wp cache flush
   args:
     chdir: "{{ site_home }}/files"
-  ignore_errors: true
+  changed_when: false

@@ -1,19 +1,19 @@
 ---
 # Delete Site Playbook
 # Removes a WordPress site and all associated resources
-# Required variables: system_name, site_domain, db_host
+# Required variables: site_id, site_domain, db_host
 
 - name: Deprovision Website
   hosts: all:!localhost
   become: true
   vars:
     php_version: "8.3"
-    db_name: "{{ system_name }}"
-    db_user: "{{ system_name }}"
+    db_name: "{{ site_id }}"
+    db_user: "{{ site_id }}"
     db_pass: "{{ lookup('password', '/dev/null', length=32) }}"
-    site_user: "{{ system_name }}"
-    site_group: "{{ system_name }}"
-    site_home: "/home/{{ site_user }}"
+    site_user: "{{ site_id }}"
+    site_group: "{{ site_id }}"
+    site_home: "/sites/{{ site_domain }}"
   tasks:
     - name: Remove cron job for {{ site_domain }}
       ansible.builtin.cron:
@@ -54,7 +54,7 @@
 
     - name: Remove PHP-FPM pool configuration
       ansible.builtin.file:
-        path: "/etc/php/{{ php_version }}/fpm/pool.d/{{ system_name }}.conf"
+        path: "/etc/php/{{ php_version }}/fpm/pool.d/{{ site_id }}.conf"
         state: absent
       notify: Reload php-fpm
 

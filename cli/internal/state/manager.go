@@ -126,7 +126,7 @@ func (m *Manager) AddSiteToServer(serverName string, site models.Site) error {
 }
 
 // RemoveSiteFromServer removes a site from a server's configuration
-func (m *Manager) RemoveSiteFromServer(serverName string, systemName string) error {
+func (m *Manager) RemoveSiteFromServer(serverName string, siteID string) error {
 	cfg, err := m.configManager.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -138,7 +138,7 @@ func (m *Manager) RemoveSiteFromServer(serverName string, systemName string) err
 			// Filter out the site to remove
 			newSites := make([]models.Site, 0)
 			for _, site := range cfg.Servers[i].Sites {
-				if site.SystemName != systemName {
+				if site.SiteID != siteID {
 					newSites = append(newSites, site)
 				} else {
 					found = true
@@ -150,7 +150,7 @@ func (m *Manager) RemoveSiteFromServer(serverName string, systemName string) err
 	}
 
 	if !found {
-		return fmt.Errorf("site '%s' not found on server '%s'", systemName, serverName)
+		return fmt.Errorf("site '%s' not found on server '%s'", siteID, serverName)
 	}
 
 	if err := m.configManager.Save(cfg); err != nil {
@@ -161,7 +161,7 @@ func (m *Manager) RemoveSiteFromServer(serverName string, systemName string) err
 }
 
 // AddDomainToSite adds a domain to a site's configuration
-func (m *Manager) AddDomainToSite(serverName string, systemName string, domain models.Domain) error {
+func (m *Manager) AddDomainToSite(serverName string, siteID string, domain models.Domain) error {
 	cfg, err := m.configManager.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -171,7 +171,7 @@ func (m *Manager) AddDomainToSite(serverName string, systemName string, domain m
 	for i := range cfg.Servers {
 		if cfg.Servers[i].Name == serverName {
 			for j := range cfg.Servers[i].Sites {
-				if cfg.Servers[i].Sites[j].SystemName == systemName {
+				if cfg.Servers[i].Sites[j].SiteID == siteID {
 					cfg.Servers[i].Sites[j].Domains = append(cfg.Servers[i].Sites[j].Domains, domain)
 					found = true
 					break
@@ -182,7 +182,7 @@ func (m *Manager) AddDomainToSite(serverName string, systemName string, domain m
 	}
 
 	if !found {
-		return fmt.Errorf("site '%s' not found on server '%s'", systemName, serverName)
+		return fmt.Errorf("site '%s' not found on server '%s'", siteID, serverName)
 	}
 
 	if err := m.configManager.Save(cfg); err != nil {
@@ -193,7 +193,7 @@ func (m *Manager) AddDomainToSite(serverName string, systemName string, domain m
 }
 
 // RemoveDomainFromSite removes a domain from a site's configuration
-func (m *Manager) RemoveDomainFromSite(serverName string, systemName string, domainName string) error {
+func (m *Manager) RemoveDomainFromSite(serverName string, siteID string, domainName string) error {
 	cfg, err := m.configManager.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -203,7 +203,7 @@ func (m *Manager) RemoveDomainFromSite(serverName string, systemName string, dom
 	for i := range cfg.Servers {
 		if cfg.Servers[i].Name == serverName {
 			for j := range cfg.Servers[i].Sites {
-				if cfg.Servers[i].Sites[j].SystemName == systemName {
+				if cfg.Servers[i].Sites[j].SiteID == siteID {
 					// Filter out the domain to remove
 					newDomains := make([]models.Domain, 0)
 					for _, d := range cfg.Servers[i].Sites[j].Domains {
@@ -222,7 +222,7 @@ func (m *Manager) RemoveDomainFromSite(serverName string, systemName string, dom
 	}
 
 	if !found {
-		return fmt.Errorf("domain '%s' not found on site '%s' on server '%s'", domainName, systemName, serverName)
+		return fmt.Errorf("domain '%s' not found on site '%s' on server '%s'", domainName, siteID, serverName)
 	}
 
 	if err := m.configManager.Save(cfg); err != nil {
@@ -233,7 +233,7 @@ func (m *Manager) RemoveDomainFromSite(serverName string, systemName string, dom
 }
 
 // UpdateDomainSSL updates a domain's SSL information
-func (m *Manager) UpdateDomainSSL(serverName string, systemName string, domainName string, updatedDomain models.Domain) error {
+func (m *Manager) UpdateDomainSSL(serverName string, siteID string, domainName string, updatedDomain models.Domain) error {
 	cfg, err := m.configManager.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -243,7 +243,7 @@ func (m *Manager) UpdateDomainSSL(serverName string, systemName string, domainNa
 	for i := range cfg.Servers {
 		if cfg.Servers[i].Name == serverName {
 			for j := range cfg.Servers[i].Sites {
-				if cfg.Servers[i].Sites[j].SystemName == systemName {
+				if cfg.Servers[i].Sites[j].SiteID == siteID {
 					for k := range cfg.Servers[i].Sites[j].Domains {
 						if cfg.Servers[i].Sites[j].Domains[k].Domain == domainName {
 							cfg.Servers[i].Sites[j].Domains[k] = updatedDomain
@@ -259,7 +259,7 @@ func (m *Manager) UpdateDomainSSL(serverName string, systemName string, domainNa
 	}
 
 	if !found {
-		return fmt.Errorf("domain '%s' not found on site '%s' on server '%s'", domainName, systemName, serverName)
+		return fmt.Errorf("domain '%s' not found on site '%s' on server '%s'", domainName, siteID, serverName)
 	}
 
 	if err := m.configManager.Save(cfg); err != nil {

@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"time"
+
 	"github.com/wordsail/cli/pkg/models"
 )
 
@@ -26,28 +28,28 @@ func FindServerIndexByName(servers []models.Server, name string) int {
 	return -1
 }
 
-// FindSiteBySystemName finds a site by system name within a server
+// FindSiteBySiteID finds a site by site ID within a server
 // Returns nil if not found
-func FindSiteBySystemName(server *models.Server, systemName string) *models.Site {
+func FindSiteBySiteID(server *models.Server, siteID string) *models.Site {
 	if server == nil {
 		return nil
 	}
 	for i := range server.Sites {
-		if server.Sites[i].SystemName == systemName {
+		if server.Sites[i].SiteID == siteID {
 			return &server.Sites[i]
 		}
 	}
 	return nil
 }
 
-// FindSiteIndexBySystemName finds a site's index by system name within a server
+// FindSiteIndexBySiteID finds a site's index by site ID within a server
 // Returns -1 if not found
-func FindSiteIndexBySystemName(server *models.Server, systemName string) int {
+func FindSiteIndexBySiteID(server *models.Server, siteID string) int {
 	if server == nil {
 		return -1
 	}
 	for i := range server.Sites {
-		if server.Sites[i].SystemName == systemName {
+		if server.Sites[i].SiteID == siteID {
 			return i
 		}
 	}
@@ -89,7 +91,29 @@ func ServerExists(servers []models.Server, name string) bool {
 	return FindServerByName(servers, name) != nil
 }
 
-// SiteExists checks if a site with the given system name exists on a server
-func SiteExists(server *models.Server, systemName string) bool {
-	return FindSiteBySystemName(server, systemName) != nil
+// SiteExists checks if a site with the given site ID exists on a server
+func SiteExists(server *models.Server, siteID string) bool {
+	return FindSiteBySiteID(server, siteID) != nil
+}
+
+// ParseSSLExpiry parses SSL certificate expiry date from openssl output format
+// Input format: "Mar 15 12:00:00 2024 GMT" or similar
+// Returns nil if parsing fails
+func ParseSSLExpiry(expiryStr string) *time.Time {
+	// Try common formats from openssl x509 -enddate output
+	formats := []string{
+		"Jan 2 15:04:05 2006 MST",
+		"Jan  2 15:04:05 2006 MST",
+		"Jan 02 15:04:05 2006 MST",
+		"2 Jan 2006 15:04:05 MST",
+		"02 Jan 2006 15:04:05 MST",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, expiryStr); err == nil {
+			return &t
+		}
+	}
+
+	return nil
 }

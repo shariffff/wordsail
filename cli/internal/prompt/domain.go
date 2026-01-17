@@ -11,7 +11,7 @@ import (
 // DomainAddInput holds the input for adding a domain
 type DomainAddInput struct {
 	ServerName string
-	SystemName string
+	SiteID     string
 	Domain     string
 	IssueSSL   bool
 }
@@ -19,14 +19,14 @@ type DomainAddInput struct {
 // DomainRemoveInput holds the input for removing a domain
 type DomainRemoveInput struct {
 	ServerName string
-	SystemName string
+	SiteID     string
 	Domain     string
 }
 
 // DomainSSLInput holds the input for issuing SSL
 type DomainSSLInput struct {
 	ServerName   string
-	SystemName   string
+	SiteID       string
 	Domain       string
 	CertbotEmail string
 }
@@ -75,7 +75,7 @@ func PromptDomainAdd(servers []models.Server) (*DomainAddInput, error) {
 	}
 
 	input.ServerName = siteOptions[selectedIndex].ServerName
-	input.SystemName = siteOptions[selectedIndex].Site.SystemName
+	input.SiteID = siteOptions[selectedIndex].Site.SiteID
 
 	// Domain name
 	domainPrompt := &survey.Input{
@@ -113,7 +113,7 @@ func PromptDomainRemove(servers []models.Server) (*DomainRemoveInput, error) {
 	// Build list of all domains
 	type DomainOption struct {
 		ServerName string
-		SystemName string
+		SiteID     string
 		Domain     models.Domain
 		IsPrimary  bool
 	}
@@ -125,7 +125,7 @@ func PromptDomainRemove(servers []models.Server) (*DomainRemoveInput, error) {
 				for _, domain := range site.Domains {
 					domainOptions = append(domainOptions, DomainOption{
 						ServerName: server.Name,
-						SystemName: site.SystemName,
+						SiteID:     site.SiteID,
 						Domain:     domain,
 						IsPrimary:  domain.Domain == site.PrimaryDomain,
 					})
@@ -150,7 +150,7 @@ func PromptDomainRemove(servers []models.Server) (*DomainRemoveInput, error) {
 			primaryMarker = " (PRIMARY)"
 		}
 		optionStrings[i] = fmt.Sprintf("%s - %s on %s%s%s",
-			opt.Domain.Domain, opt.SystemName, opt.ServerName, sslStatus, primaryMarker)
+			opt.Domain.Domain, opt.SiteID, opt.ServerName, sslStatus, primaryMarker)
 	}
 
 	var selectedIndex int
@@ -186,7 +186,7 @@ func PromptDomainRemove(servers []models.Server) (*DomainRemoveInput, error) {
 	}
 
 	input.ServerName = selected.ServerName
-	input.SystemName = selected.SystemName
+	input.SiteID = selected.SiteID
 	input.Domain = selected.Domain.Domain
 
 	return input, nil
@@ -199,7 +199,7 @@ func PromptDomainSSL(servers []models.Server, defaultEmail string) (*DomainSSLIn
 	// Build list of domains without SSL
 	type DomainOption struct {
 		ServerName string
-		SystemName string
+		SiteID     string
 		SiteDomain string
 		Domain     models.Domain
 	}
@@ -212,7 +212,7 @@ func PromptDomainSSL(servers []models.Server, defaultEmail string) (*DomainSSLIn
 					if !domain.SSLEnabled {
 						domainOptions = append(domainOptions, DomainOption{
 							ServerName: server.Name,
-							SystemName: site.SystemName,
+							SiteID:     site.SiteID,
 							SiteDomain: site.PrimaryDomain,
 							Domain:     domain,
 						})
@@ -245,7 +245,7 @@ func PromptDomainSSL(servers []models.Server, defaultEmail string) (*DomainSSLIn
 
 	selected := domainOptions[selectedIndex]
 	input.ServerName = selected.ServerName
-	input.SystemName = selected.SystemName
+	input.SiteID = selected.SiteID
 	input.Domain = selected.Domain.Domain
 
 	// Certbot email

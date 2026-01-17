@@ -3,8 +3,31 @@
   ansible.builtin.assert:
     that:
       - domain is defined and domain != ""
-    fail_msg: "Required variable missing: domain must be provided for issue_ssl operation"
-    success_msg: "Required domain variable is properly defined"
+      - certbot_email is defined and certbot_email != ""
+    fail_msg: |
+      Required variables missing for issue_ssl operation:
+        - domain: Domain name to issue SSL certificate for
+        - certbot_email: Email address for Let's Encrypt notifications
+    success_msg: "All required variables are properly defined"
+  tags: issue_ssl
+
+# DNS verification before SSL issuance
+- name: Check DNS before SSL issuance
+  ansible.builtin.include_tasks:
+    file: check_dns.yml
+  when: dns_matches_server is not defined
+  tags: issue_ssl
+
+- name: Fail if DNS doesn't match server
+  ansible.builtin.fail:
+    msg: |
+      DNS_MISMATCH: domain={{ domain }} resolved_ip={{ domain_resolved_ip }} server_ip={{ server_ip }}
+
+      DNS for {{ domain }} does not point to this server.
+      Please update your DNS A record to point to {{ server_ip }}
+  when:
+    - dns_matches_server is defined
+    - not dns_matches_server | bool
   tags: issue_ssl
 
 - name: Check if well-known.conf exists
@@ -169,17 +192,30 @@
     cmd: wp option update home 'https://{{ domain }}'
     chdir: /sites/{{ domain }}/files
   become: true
-  become_user: "{{ system_name }}"
+  become_user: "{{ site_id }}"
   changed_when: true
   tags: issue_ssl
-  when: system_name is defined
+  when: site_id is defined
 
 - name: Update WordPress site URL to HTTPS
   ansible.builtin.command:
     cmd: wp option update siteurl 'https://{{ domain }}'
     chdir: /sites/{{ domain }}/files
   become: true
-  become_user: "{{ system_name }}"
+  become_user: "{{ site_id }}"
   changed_when: true
   tags: issue_ssl
-  when: system_name is defined
+  when: site_id is defined
+
+# Get and display SSL certificate expiry for CLI parsing
+- name: Get certificate expiry date
+  ansible.builtin.command:
+    cmd: "openssl x509 -enddate -noout -in /etc/letsencrypt/live/{{ domain }}/cert.pem"
+  register: cert_expiry_raw
+  changed_when: false
+  tags: issue_ssl
+
+- name: Display SSL expiry (for CLI parsing)
+  ansible.builtin.debug:
+    msg: "SSL_ISSUED: domain={{ domain }} expiry={{ cert_expiry_raw.stdout | regex_replace('notAfter=', '') }}"
+  tags: issue_ssl

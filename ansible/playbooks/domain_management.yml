@@ -8,6 +8,17 @@
     domain_enabled_path: "/etc/nginx/sites-enabled"
     ssl_cert_path: "/etc/letsencrypt/live"
 
+  pre_tasks:
+    - name: Validate operation variable
+      ansible.builtin.assert:
+        that:
+          - operation is defined and operation | length > 0
+          - operation in ['add_domain', 'remove_domain', 'issue_ssl']
+        fail_msg: |
+          Invalid or missing operation. Please provide:
+            - operation: One of 'add_domain', 'remove_domain', or 'issue_ssl'
+          Pass via --extra-vars "operation=add_domain"
+
   tasks:
     - name: Add domain to Nginx
       ansible.builtin.include_role:

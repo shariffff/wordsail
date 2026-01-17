@@ -19,13 +19,13 @@
     group: root
     mode: "0644"
   loop:
-    - { src: "pool.conf.j2", dest: "/etc/php/{{ php_version }}/fpm/pool.d/{{ system_name }}.conf" }
+    - { src: "pool.conf.j2", dest: "/etc/php/{{ php_version }}/fpm/pool.d/{{ site_id }}.conf" }
     - { src: "wordsail-pool.conf.j2", dest: "{{ site_home }}/.wordsail-pool.conf" }
   notify: Reload php-fpm
 
 - name: Set ACL for PHP-FPM pool config
   ansible.posix.acl:
-    path: "/etc/php/{{ php_version }}/fpm/pool.d/{{ system_name }}.conf"
+    path: "/etc/php/{{ php_version }}/fpm/pool.d/{{ site_id }}.conf"
     entity: "{{ site_group }}"
     etype: group
     permissions: "---"

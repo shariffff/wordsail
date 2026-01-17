@@ -12,6 +12,7 @@ import (
 	"github.com/wordsail/cli/internal/config"
 	"github.com/wordsail/cli/internal/prompt"
 	"github.com/wordsail/cli/internal/state"
+	"github.com/wordsail/cli/internal/utils"
 	"github.com/wordsail/cli/pkg/models"
 )
 
@@ -65,7 +66,7 @@ Examples:
 			issueSSL, _ := cmd.Flags().GetBool("ssl")
 			input = &prompt.DomainAddInput{
 				ServerName: serverName,
-				SystemName: siteName,
+				SiteID:     siteName,
 				Domain:     domain,
 				IssueSSL:   issueSSL,
 			}
@@ -98,9 +99,9 @@ Examples:
 
 		// Prepare extra vars for Ansible
 		extraVars := map[string]interface{}{
-			"operation":   "add_domain",
-			"domain":      input.Domain,
-			"system_name": input.SystemName,
+			"operation": "add_domain",
+			"domain":    input.Domain,
+			"site_id":   input.SiteID,
 		}
 
 		// Create Ansible executor
@@ -127,7 +128,7 @@ Examples:
 		}
 
 		stateMgr := state.NewManager(mgr)
-		if err := stateMgr.AddDomainToSite(input.ServerName, input.SystemName, newDomain); err != nil {
+		if err := stateMgr.AddDomainToSite(input.ServerName, input.SiteID, newDomain); err != nil {
 			color.Red("Warning: Failed to update configuration: %v", err)
 		}
 
@@ -153,7 +154,8 @@ Examples:
 				"certbot_email": certbotEmail,
 			}
 
-			if err := executor.ExecutePlaybook("playbooks/domain_management.yml", *targetServer, sslVars, cfg.GlobalVars); err != nil {
+			sslResult, err := executor.ExecutePlaybookWithResult("playbooks/domain_management.yml", *targetServer, sslVars, cfg.GlobalVars)
+			if err != nil {
 				color.Red("\n✗ SSL certificate issuance failed: %v", err)
 				fmt.Println("The domain has been added but SSL is not configured.")
 				fmt.Println("You can issue SSL later with: wordsail domain ssl")
@@ -162,16 +164,27 @@ Examples:
 
 			// Update domain with SSL info
 			now := time.Now()
-			expiresAt := now.AddDate(0, 3, 0) // SSL certs expire in 90 days
+			var expiresAt *time.Time
+
+			// Try to parse actual expiry from Ansible output
+			if sslResult.SSLInfo != nil && sslResult.SSLInfo.Expiry != "" {
+				expiresAt = utils.ParseSSLExpiry(sslResult.SSLInfo.Expiry)
+			}
+
+			// Fallback to 90 days if parsing fails
+			if expiresAt == nil {
+				fallback := now.AddDate(0, 3, 0)
+				expiresAt = &fallback
+			}
 
 			sslDomain := models.Domain{
 				Domain:       input.Domain,
 				SSLEnabled:   true,
 				SSLIssuedAt:  &now,
-				SSLExpiresAt: &expiresAt,
+				SSLExpiresAt: expiresAt,
 			}
 
-			if err := stateMgr.UpdateDomainSSL(input.ServerName, input.SystemName, input.Domain, sslDomain); err != nil {
+			if err := stateMgr.UpdateDomainSSL(input.ServerName, input.SiteID, input.Domain, sslDomain); err != nil {
 				color.Red("Warning: Failed to update SSL status in configuration: %v", err)
 			}
 
@@ -230,7 +243,7 @@ Examples:
 			// Non-interactive mode
 			input = &prompt.DomainRemoveInput{
 				ServerName: serverName,
-				SystemName: siteName,
+				SiteID:     siteName,
 				Domain:     domain,
 			}
 		} else if serverName != "" || siteName != "" || domain != "" {
@@ -308,7 +321,7 @@ Examples:
 
 		// Remove domain from configuration
 		stateMgr := state.NewManager(mgr)
-		if err := stateMgr.RemoveDomainFromSite(input.ServerName, input.SystemName, input.Domain); err != nil {
+		if err := stateMgr.RemoveDomainFromSite(input.ServerName, input.SiteID, input.Domain); err != nil {
 			color.Red("Warning: Failed to update configuration: %v", err)
 		}
 
@@ -367,7 +380,7 @@ Examples:
 			}
 			input = &prompt.DomainSSLInput{
 				ServerName:   serverName,
-				SystemName:   siteName,
+				SiteID:       siteName,
 				Domain:       domain,
 				CertbotEmail: email,
 			}
@@ -417,24 +430,36 @@ Examples:
 		color.Cyan("═══════════════════════════════════════════════════════")
 		fmt.Println()
 
-		if err := executor.ExecutePlaybook("playbooks/domain_management.yml", *targetServer, extraVars, cfg.GlobalVars); err != nil {
+		result, err := executor.ExecutePlaybookWithResult("playbooks/domain_management.yml", *targetServer, extraVars, cfg.GlobalVars)
+		if err != nil {
 			color.Red("\n✗ SSL certificate issuance failed: %v", err)
 			os.Exit(1)
 		}
 
 		// Update domain with SSL info
 		now := time.Now()
-		expiresAt := now.AddDate(0, 3, 0) // SSL certs expire in 90 days
+		var expiresAt *time.Time
+
+		// Try to parse actual expiry from Ansible output
+		if result.SSLInfo != nil && result.SSLInfo.Expiry != "" {
+			expiresAt = utils.ParseSSLExpiry(result.SSLInfo.Expiry)
+		}
+
+		// Fallback to 90 days if parsing fails
+		if expiresAt == nil {
+			fallback := now.AddDate(0, 3, 0)
+			expiresAt = &fallback
+		}
 
 		sslDomain := models.Domain{
 			Domain:       input.Domain,
 			SSLEnabled:   true,
 			SSLIssuedAt:  &now,
-			SSLExpiresAt: &expiresAt,
+			SSLExpiresAt: expiresAt,
 		}
 
 		stateMgr := state.NewManager(mgr)
-		if err := stateMgr.UpdateDomainSSL(input.ServerName, input.SystemName, input.Domain, sslDomain); err != nil {
+		if err := stateMgr.UpdateDomainSSL(input.ServerName, input.SiteID, input.Domain, sslDomain); err != nil {
 			color.Red("Warning: Failed to update configuration: %v", err)
 		}
 
@@ -458,21 +483,21 @@ func init() {
 
 	// domain add flags (non-interactive mode)
 	domainAddCmd.Flags().String("server", "", "Server name")
-	domainAddCmd.Flags().String("site", "", "Site system name")
+	domainAddCmd.Flags().String("site", "", "Site ID")
 	domainAddCmd.Flags().String("domain", "", "Domain to add")
 	domainAddCmd.Flags().Bool("ssl", false, "Issue SSL certificate for the domain")
 	domainAddCmd.Flags().Bool("json", false, "Output in JSON format")
 
 	// domain remove flags
 	domainRemoveCmd.Flags().String("server", "", "Server name")
-	domainRemoveCmd.Flags().String("site", "", "Site system name")
+	domainRemoveCmd.Flags().String("site", "", "Site ID")
 	domainRemoveCmd.Flags().String("domain", "", "Domain to remove")
 	domainRemoveCmd.Flags().BoolP("force", "f", false, "Force removal without confirmation")
 	domainRemoveCmd.Flags().Bool("json", false, "Output in JSON format")
 
 	// domain ssl flags (non-interactive mode)
 	domainSSLCmd.Flags().String("server", "", "Server name")
-	domainSSLCmd.Flags().String("site", "", "Site system name")
+	domainSSLCmd.Flags().String("site", "", "Site ID")
 	domainSSLCmd.Flags().String("domain", "", "Domain to issue SSL for")
 	domainSSLCmd.Flags().String("email", "", "Email for Let's Encrypt notifications")
 	domainSSLCmd.Flags().Bool("json", false, "Output in JSON format")

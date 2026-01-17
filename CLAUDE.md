@@ -44,7 +44,7 @@ ansible-playbook provision.yml -i "SERVER_IP," -u root
 ```bash
 cd ansible
 ansible-playbook website.yml -i "SERVER_IP," -u wordsail \
-  --extra-vars "domain=example.com system_name=examplecom wp_admin_user=admin wp_admin_email=admin@example.com wp_admin_password=SecurePass123"
+  --extra-vars "domain=example.com site_id=examplecom wp_admin_user=admin wp_admin_email=admin@example.com wp_admin_password=SecurePass123"
 ```
 
 **Domain management:**
@@ -52,7 +52,7 @@ ansible-playbook website.yml -i "SERVER_IP," -u wordsail \
 cd ansible
 # Add domain
 ansible-playbook playbooks/domain_management.yml -i "IP," -u wordsail \
-  --extra-vars "operation=add_domain domain=newdomain.com system_name=sitename"
+  --extra-vars "operation=add_domain domain=newdomain.com site_id=sitename"
 
 # Remove domain
 ansible-playbook playbooks/domain_management.yml -i "IP," -u wordsail \
@@ -67,7 +67,7 @@ ansible-playbook playbooks/domain_management.yml -i "IP," -u wordsail \
 ```bash
 cd ansible
 ansible-playbook playbooks/delete_site.yml -i "IP," -u wordsail \
-  --extra-vars "system_name=examplecom"
+  --extra-vars "site_id=examplecom"
 ```
 
 ### Running with Specific Tags
@@ -218,7 +218,7 @@ wordsail domain ssl
 - All state stored in `~/.wordsail/servers.yaml`
 - Config structure: version, ansible settings, global_vars, servers array
 - Each server has: name, hostname, ip, ssh config, status, sites array
-- Each site has: domain, system_name, admin credentials, domains array
+- Each site has: domain, site_id, admin credentials, domains array
 - Each domain has: name, ssl_enabled, ssl_expiry
 
 **Ansible Integration:**
@@ -243,7 +243,7 @@ For `website.yml`:
 | Variable | Description |
 |----------|-------------|
 | `domain` | Primary domain name |
-| `system_name` | System identifier (used for user, db, PHP pool) |
+| `site_id` | Site identifier (used for user, db, PHP pool) - auto-generated if not provided |
 | `wp_admin_user` | WordPress admin username |
 | `wp_admin_email` | WordPress admin email |
 | `wp_admin_password` | WordPress admin password |

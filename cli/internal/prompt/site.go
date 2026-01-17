@@ -16,7 +16,7 @@ import (
 type SiteInput struct {
 	ServerName    string
 	Domain        string
-	SystemName    string
+	SiteID        string
 	AdminUser     string
 	AdminEmail    string
 	AdminPassword string
@@ -68,24 +68,9 @@ func PromptSiteCreate(servers []models.Server) (*SiteInput, error) {
 		return nil, err
 	}
 
-	// 3. System name (with smart default)
-	defaultSystemName := generateSystemName(input.Domain)
-	systemNamePrompt := &survey.Input{
-		Message: "System username:",
-		Help:    "Linux user for this site (alphanumeric only, 3-16 chars)",
-		Default: defaultSystemName,
-	}
-	if err := survey.AskOne(systemNamePrompt, &input.SystemName, survey.WithValidator(survey.Required), survey.WithValidator(utils.ValidateSystemName)); err != nil {
-		return nil, err
-	}
-
-	// Check if system name already exists on this server
+	// 3. Auto-generate unique site ID (no prompt needed)
 	selectedServer := provisionedServers[serverIndex]
-	for _, site := range selectedServer.Sites {
-		if site.SystemName == input.SystemName {
-			return nil, fmt.Errorf("system name '%s' already exists on server '%s'", input.SystemName, input.ServerName)
-		}
-	}
+	input.SiteID = generateUniqueSiteID(input.Domain, selectedServer.Sites)
 
 	// 4. WordPress admin user
 	adminUserPrompt := &survey.Input{
@@ -161,7 +146,7 @@ func confirmSiteCreation(input *SiteInput) error {
 	fmt.Println("═══════════════════════════════════════════════════")
 	fmt.Printf("  Server:       %s\n", input.ServerName)
 	fmt.Printf("  Domain:       %s\n", input.Domain)
-	fmt.Printf("  System Name:  %s\n", input.SystemName)
+	fmt.Printf("  Site ID:      %s\n", input.SiteID)
 	fmt.Printf("  Admin User:   %s\n", input.AdminUser)
 	fmt.Printf("  Admin Email:  %s\n", input.AdminEmail)
 	fmt.Println("═══════════════════════════════════════════════════")
@@ -186,9 +171,32 @@ func confirmSiteCreation(input *SiteInput) error {
 
 // Helper functions
 
-func generateSystemName(domain string) string {
+// generateUniqueSiteID creates a unique site ID from the domain, handling collisions
+func generateUniqueSiteID(domain string, existingSites []models.Site) string {
+	base := generateBaseSiteID(domain)
+
+	// Check for collisions and append number if needed
+	candidate := base
+	suffix := 2
+	for siteIDExists(existingSites, candidate) {
+		// Calculate how much space we have for the suffix
+		suffixStr := fmt.Sprintf("%d", suffix)
+		maxBaseLen := 16 - len(suffixStr)
+		if len(base) > maxBaseLen {
+			candidate = base[:maxBaseLen] + suffixStr
+		} else {
+			candidate = base + suffixStr
+		}
+		suffix++
+	}
+
+	return candidate
+}
+
+// generateBaseSiteID generates a base site ID from a domain name
+func generateBaseSiteID(domain string) string {
 	// Remove common TLDs
-	tlds := []string{".com", ".net", ".org", ".io", ".co", ".dev", ".app"}
+	tlds := []string{".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".xyz", ".info", ".biz"}
 	name := domain
 	for _, tld := range tlds {
 		name = strings.TrimSuffix(name, tld)
@@ -198,9 +206,9 @@ func generateSystemName(domain string) string {
 	alphanumRegex := regexp.MustCompile(`[^a-zA-Z0-9]`)
 	name = alphanumRegex.ReplaceAllString(name, "")
 
-	// Limit to 16 characters
-	if len(name) > 16 {
-		name = name[:16]
+	// Limit to 14 characters (leaving room for numeric suffix)
+	if len(name) > 14 {
+		name = name[:14]
 	}
 
 	// Ensure at least 3 characters
@@ -209,6 +217,21 @@ func generateSystemName(domain string) string {
 	}
 
 	return strings.ToLower(name)
+}
+
+// siteIDExists checks if a site ID already exists in the list
+func siteIDExists(sites []models.Site, id string) bool {
+	for _, site := range sites {
+		if site.SiteID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// GenerateSiteID is exported for use by cmd package in non-interactive mode
+func GenerateSiteID(domain string, existingSites []models.Site) string {
+	return generateUniqueSiteID(domain, existingSites)
 }
 
 func generateSecurePassword(length int) string {

@@ -24,21 +24,21 @@ func ValidateDomain(val interface{}) error {
 	return nil
 }
 
-// ValidateSystemName validates a system username (alphanumeric, 3-16 chars)
-func ValidateSystemName(val interface{}) error {
+// ValidateSiteID validates a site ID (alphanumeric, 3-16 chars)
+func ValidateSiteID(val interface{}) error {
 	name, ok := val.(string)
 	if !ok {
-		return fmt.Errorf("invalid system name type")
+		return fmt.Errorf("invalid site ID type")
 	}
 
 	// Alphanumeric only, 3-16 characters
 	if len(name) < 3 || len(name) > 16 {
-		return fmt.Errorf("system name must be 3-16 characters")
+		return fmt.Errorf("site ID must be 3-16 characters")
 	}
 
 	alphanumRegex := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
 	if !alphanumRegex.MatchString(name) {
-		return fmt.Errorf("system name must be alphanumeric only")
+		return fmt.Errorf("site ID must be alphanumeric only")
 	}
 
 	return nil
