@@ -16,41 +16,7 @@ import (
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage wordsail configuration",
-	Long:  `Initialize, display, and validate the wordsail configuration file.`,
-}
-
-// configInitCmd represents the config init command
-var configInitCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initialize wordsail configuration",
-	Long:  `Create a new configuration file at ~/.wordsail/servers.yaml with default values.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		mgr, err := config.NewManager()
-		if err != nil {
-			color.Red("Error: %v", err)
-			os.Exit(1)
-		}
-
-		if mgr.ConfigExists() {
-			color.Yellow("Configuration file already exists at: %s", mgr.GetConfigPath())
-			fmt.Println("To reinitialize, please delete the existing file first.")
-			os.Exit(1)
-		}
-
-		if err := mgr.Initialize(); err != nil {
-			color.Red("Error: Failed to initialize configuration: %v", err)
-			os.Exit(1)
-		}
-
-		color.Green("✓ Created %s directory", mgr.GetConfigDir())
-		color.Green("✓ Generated default servers.yaml")
-		color.Green("✓ Configuration initialized successfully")
-		fmt.Println()
-		fmt.Println("Next steps:")
-		fmt.Println("  1. Edit ~/.wordsail/servers.yaml with your settings")
-		fmt.Println("  2. Add your first server: wordsail server add")
-		fmt.Println("  3. Provision the server: wordsail server provision <name>")
-	},
+	Long:  `Display, validate, and edit the wordsail configuration file.`,
 }
 
 // configShowCmd represents the config show command
@@ -67,7 +33,7 @@ var configShowCmd = &cobra.Command{
 
 		if !mgr.ConfigExists() {
 			color.Red("Configuration file not found at: %s", mgr.GetConfigPath())
-			fmt.Println("Run 'wordsail config init' to create it.")
+			fmt.Println("Run 'wordsail init' to create it.")
 			os.Exit(1)
 		}
 
@@ -103,7 +69,7 @@ var configValidateCmd = &cobra.Command{
 
 		if !mgr.ConfigExists() {
 			color.Red("Configuration file not found at: %s", mgr.GetConfigPath())
-			fmt.Println("Run 'wordsail config init' to create it.")
+			fmt.Println("Run 'wordsail init' to create it.")
 			os.Exit(1)
 		}
 
@@ -165,7 +131,7 @@ var configEditCmd = &cobra.Command{
 
 		if !mgr.ConfigExists() {
 			color.Red("Configuration file not found at: %s", mgr.GetConfigPath())
-			fmt.Println("Run 'wordsail config init' to create it.")
+			fmt.Println("Run 'wordsail init' to create it.")
 			os.Exit(1)
 		}
 
@@ -206,7 +172,6 @@ var configEditCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(configCmd)
-	configCmd.AddCommand(configInitCmd)
 	configCmd.AddCommand(configShowCmd)
 	configCmd.AddCommand(configValidateCmd)
 	configCmd.AddCommand(configEditCmd)

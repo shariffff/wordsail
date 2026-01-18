@@ -26,11 +26,11 @@ var rootCmd = &cobra.Command{
 by wrapping Ansible playbooks with an intuitive, interactive interface.
 
 Manage servers, sites, and domains with ease while maintaining full
-visibility into your infrastructure state via ~/.wordsail/servers.yaml
+visibility into your infrastructure state via ~/.wordsail/wordsail.yaml
 
 Examples:
   # Initialize configuration
-  wordsail config init
+  wordsail init
 
   # Add and provision a new server
   wordsail server provision

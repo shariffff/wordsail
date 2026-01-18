@@ -167,7 +167,7 @@ apt install wordsail
 
 ## How It Works
 
-1. **CLI manages state** - Server and site configuration stored in `~/.wordsail/servers.yaml`
+1. **CLI manages state** - Server and site configuration stored in `~/.wordsail/wordsail.yaml`
 2. **CLI executes Ansible** - Generates dynamic inventory and runs playbooks
 3. **Ansible configures servers** - Idempotent playbooks ensure consistent state
 4. **CLI updates state** - After successful operations, configuration is updated

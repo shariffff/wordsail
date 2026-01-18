@@ -20,7 +20,7 @@ var initCmd = &cobra.Command{
 This command will:
   1. Create ~/.wordsail/ directory structure
   2. Copy Ansible playbooks from the repository to ~/.wordsail/ansible/
-  3. Create initial configuration file (servers.yaml)
+  3. Create initial configuration file (wordsail.yaml)
   4. Prompt for global settings (SSH key, certbot email)
   5. Validate the installation
 

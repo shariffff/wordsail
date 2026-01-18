@@ -138,10 +138,13 @@ make clean
 
 ### CLI Commands Overview
 ```bash
-# Configuration
-wordsail config init
+# Initialization (run once after install)
+wordsail init
+
+# Configuration management
 wordsail config show
 wordsail config validate
+wordsail config edit
 
 # Server management
 wordsail server add
@@ -215,7 +218,7 @@ wordsail domain ssl
 - `templates/`: Ansible inventory templates
 
 **State Management:**
-- All state stored in `~/.wordsail/servers.yaml`
+- All state stored in `~/.wordsail/wordsail.yaml`
 - Config structure: version, ansible settings, global_vars, servers array
 - Each server has: name, hostname, ip, ssh config, status, sites array
 - Each site has: domain, site_id, admin credentials, domains array

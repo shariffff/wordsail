@@ -38,7 +38,7 @@ var siteCreateCmd = &cobra.Command{
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			color.Red("Configuration file not found. Run 'wordsail init' first.")
 			os.Exit(1)
 		}
 
@@ -274,7 +274,7 @@ var siteListCmd = &cobra.Command{
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			color.Red("Configuration file not found. Run 'wordsail init' first.")
 			os.Exit(1)
 		}
 
@@ -383,7 +383,7 @@ var siteDeleteCmd = &cobra.Command{
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			color.Red("Configuration file not found. Run 'wordsail init' first.")
 			os.Exit(1)
 		}
 

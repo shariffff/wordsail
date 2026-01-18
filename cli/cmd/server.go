@@ -47,7 +47,7 @@ Examples:
 		}
 
 		if !mgr.ConfigExists() {
-			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail init' first"))
 			os.Exit(1)
 		}
 
@@ -147,7 +147,7 @@ var serverListCmd = &cobra.Command{
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			color.Red("Configuration file not found. Run 'wordsail init' first.")
 			os.Exit(1)
 		}
 
@@ -231,7 +231,7 @@ delete the server from your cloud provider (AWS, DigitalOcean, etc.) if needed.`
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			color.Red("Configuration file not found. Run 'wordsail init' first.")
 			os.Exit(1)
 		}
 
@@ -362,7 +362,7 @@ Examples:
 		}
 
 		if !mgr.ConfigExists() {
-			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail init' first"))
 			os.Exit(1)
 		}
 
@@ -633,7 +633,7 @@ Examples:
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			color.Red("Configuration file not found. Run 'wordsail init' first.")
 			os.Exit(1)
 		}
 
@@ -721,7 +721,7 @@ Examples:
 		}
 
 		if !mgr.ConfigExists() {
-			color.Red("Configuration file not found. Run 'wordsail config init' first.")
+			color.Red("Configuration file not found. Run 'wordsail init' first.")
 			os.Exit(1)
 		}
 

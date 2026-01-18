@@ -10,7 +10,7 @@ import (
 
 const (
 	DefaultConfigDir  = ".wordsail"
-	DefaultConfigFile = "servers.yaml"
+	DefaultConfigFile = "wordsail.yaml"
 )
 
 // Manager handles loading and saving configuration

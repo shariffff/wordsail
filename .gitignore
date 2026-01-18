@@ -45,7 +45,7 @@ ansible/*.retry
 __pycache__/
 
 # User configuration (should be in ~/.wordsail/)
-servers.yaml
+wordsail.yaml
 config.yaml
 
 # Logs

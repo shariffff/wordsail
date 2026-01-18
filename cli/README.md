@@ -5,7 +5,7 @@ A command-line interface tool for managing WordPress hosting infrastructure usin
 ## Features
 
 - **Dual Operating Modes**: Interactive prompts for manual use, script mode with flags for automation
-- **YAML-based State Management**: All configuration stored in `~/.wordsail/servers.yaml`
+- **YAML-based State Management**: All configuration stored in `~/.wordsail/wordsail.yaml`
 - **Ansible Integration**: Seamlessly executes existing Ansible playbooks
 - **Server Management**: Add, list, remove, and provision servers
 - **Site Management**: Create, list, and delete WordPress sites
@@ -15,7 +15,7 @@ A command-line interface tool for managing WordPress hosting infrastructure usin
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.24 or higher (or Docker for building without Go)
 - Ansible installed and configured
 - SSH access to target servers
 
@@ -25,8 +25,11 @@ A command-line interface tool for managing WordPress hosting infrastructure usin
 # Clone or navigate to the repository
 cd /path/to/ansible/cli
 
-# Build the binary
+# Build the binary (requires Go 1.24+)
 make build
+
+# Or build using Docker (no Go required)
+make docker-build
 
 # Install to /usr/local/bin (requires sudo)
 make install
@@ -47,14 +50,14 @@ wordsail --help
 ### 1. Initialize Configuration
 
 ```bash
-wordsail config init
+wordsail init
 ```
 
-This creates `~/.wordsail/servers.yaml` with default settings.
+This creates `~/.wordsail/wordsail.yaml` with default settings.
 
 ### 2. Configure Ansible Path
 
-Edit `~/.wordsail/servers.yaml` and set the correct Ansible project path:
+Edit `~/.wordsail/wordsail.yaml` and set the correct Ansible project path:
 
 ```yaml
 ansible:
@@ -139,14 +142,14 @@ wordsail site create --non-interactive \
 ### Configuration Management
 
 ```bash
-# Initialize configuration
-wordsail config init
-
 # Show current configuration
 wordsail config show
 
 # Validate configuration
 wordsail config validate
+
+# Edit configuration in your preferred editor
+wordsail config edit
 ```
 
 ### Server Management
@@ -236,7 +239,7 @@ wordsail domain ssl
 
 ## Configuration File
 
-The configuration file is located at `~/.wordsail/servers.yaml`. Here's an example structure:
+The configuration file is located at `~/.wordsail/wordsail.yaml`. Here's an example structure:
 
 ```yaml
 version: '1.0'

@@ -44,7 +44,7 @@ Examples:
 		}
 
 		if !mgr.ConfigExists() {
-			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail init' first"))
 			os.Exit(1)
 		}
 
@@ -222,7 +222,7 @@ Examples:
 		}
 
 		if !mgr.ConfigExists() {
-			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail init' first"))
 			os.Exit(1)
 		}
 
@@ -349,7 +349,7 @@ Examples:
 		}
 
 		if !mgr.ConfigExists() {
-			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail config init' first"))
+			outputError(cmd, "Configuration file not found", fmt.Errorf("run 'wordsail init' first"))
 			os.Exit(1)
 		}
 
