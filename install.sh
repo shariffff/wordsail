@@ -10,12 +10,12 @@ BINARY_NAME="wordsail"
 # Install directory (like Bun's ~/.bun)
 install_dir="${WORDSAIL_INSTALL:-$HOME/.wordsail}"
 bin_dir="$install_dir/bin"
+ansible_dir="$install_dir/ansible"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
@@ -48,27 +48,28 @@ get_latest_version() {
     curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
 }
 
-# Add to shell config
+# Add to shell config and return the config file path
 setup_shell() {
     local shell_name=$(basename "$SHELL")
+    local config_file=""
+    local shell_export=""
 
     case $shell_name in
         fish)
-            local config_file="$HOME/.config/fish/config.fish"
-            local shell_export="set --export WORDSAIL_INSTALL \"$install_dir\"\nset --export PATH \$WORDSAIL_INSTALL/bin \$PATH"
+            config_file="$HOME/.config/fish/config.fish"
+            shell_export="set --export WORDSAIL_INSTALL \"$install_dir\"\nset --export PATH \$WORDSAIL_INSTALL/bin \$PATH"
             ;;
         zsh)
-            local config_file="$HOME/.zshrc"
-            local shell_export="export WORDSAIL_INSTALL=\"$install_dir\"\nexport PATH=\"\$WORDSAIL_INSTALL/bin:\$PATH\""
+            config_file="$HOME/.zshrc"
+            shell_export="export WORDSAIL_INSTALL=\"$install_dir\"\nexport PATH=\"\$WORDSAIL_INSTALL/bin:\$PATH\""
             ;;
         bash)
-            # Prefer .bashrc on Linux, .bash_profile on macOS
             if [[ -f "$HOME/.bashrc" ]]; then
-                local config_file="$HOME/.bashrc"
+                config_file="$HOME/.bashrc"
             else
-                local config_file="$HOME/.bash_profile"
+                config_file="$HOME/.bash_profile"
             fi
-            local shell_export="export WORDSAIL_INSTALL=\"$install_dir\"\nexport PATH=\"\$WORDSAIL_INSTALL/bin:\$PATH\""
+            shell_export="export WORDSAIL_INSTALL=\"$install_dir\"\nexport PATH=\"\$WORDSAIL_INSTALL/bin:\$PATH\""
             ;;
         *)
             echo ""
@@ -83,11 +84,15 @@ setup_shell() {
 
     # Check if already configured
     if [[ -f "$config_file" ]] && grep -q "WORDSAIL_INSTALL" "$config_file" 2>/dev/null; then
+        # Already configured, just export for current session
+        export WORDSAIL_INSTALL="$install_dir"
+        export PATH="$bin_dir:$PATH"
         return
     fi
 
     # Create config file if it doesn't exist
     if [[ ! -f "$config_file" ]]; then
+        mkdir -p "$(dirname "$config_file")"
         touch "$config_file"
     fi
 
@@ -101,11 +106,17 @@ setup_shell() {
     fi
 
     # Append to config
-    echo "" >> "$config_file"
-    echo "# WordSail" >> "$config_file"
-    echo -e "$shell_export" >> "$config_file"
+    {
+        echo ""
+        echo "# WordSail"
+        echo -e "$shell_export"
+    } >> "$config_file"
 
     echo -e "${DIM}Added to $config_file${NC}"
+
+    # Export for current session
+    export WORDSAIL_INSTALL="$install_dir"
+    export PATH="$bin_dir:$PATH"
 }
 
 # Download and install
@@ -124,7 +135,8 @@ install_wordsail() {
     echo -e "${DIM}Installing WordSail ${version} (${os}/${arch})${NC}"
 
     # Construct download URL
-    local filename="${BINARY_NAME}_${version_num}_${os}_${arch}"
+    local archive_name="wordsail_${version_num}_${os}_${arch}"
+    local filename="${archive_name}"
     if [[ "$os" = "windows" ]]; then
         filename="${filename}.zip"
     else
@@ -138,6 +150,7 @@ install_wordsail() {
     trap "rm -rf ${tmp_dir}" EXIT
 
     # Download
+    echo -e "${DIM}Downloading...${NC}"
     if ! curl -fsSL "$url" -o "${tmp_dir}/${filename}" 2>/dev/null; then
         error "Failed to download from ${url}"
     fi
@@ -150,24 +163,33 @@ install_wordsail() {
         tar -xzf "${filename}"
     fi
 
-    # Create install directory
+    # Create install directories
     mkdir -p "${bin_dir}"
 
-    # Install binary
+    # Find and install binary
     local binary="${BINARY_NAME}"
     if [[ "$os" = "windows" ]]; then
         binary="${BINARY_NAME}.exe"
     fi
 
-    if [[ -f "${binary}" ]]; then
-        mv "${binary}" "${bin_dir}/"
-    elif [[ -f "${BINARY_NAME}/${binary}" ]]; then
-        mv "${BINARY_NAME}/${binary}" "${bin_dir}/"
+    # Binary is inside the archive_name folder
+    if [[ -f "${archive_name}/${binary}" ]]; then
+        mv "${archive_name}/${binary}" "${bin_dir}/"
     else
         error "Binary not found in archive"
     fi
 
     chmod +x "${bin_dir}/${binary}"
+
+    # Install ansible directory
+    if [[ -d "${archive_name}/ansible" ]]; then
+        # Remove old ansible dir if exists
+        rm -rf "${ansible_dir}"
+        mv "${archive_name}/ansible" "${ansible_dir}"
+        echo -e "${DIM}Installed ansible playbooks to ${ansible_dir}${NC}"
+    else
+        warn "Ansible directory not found in archive"
+    fi
 }
 
 # Main
@@ -188,9 +210,9 @@ main() {
     echo ""
     echo "Run the following to get started:"
     echo ""
-    echo -e "  ${BOLD}wordsail init${NC}"
+    echo -e "  ${BOLD}source ~/.$(basename $SHELL)rc && wordsail init${NC}"
     echo ""
-    echo -e "${DIM}If 'wordsail' is not found, restart your terminal.${NC}"
+    echo -e "${DIM}Or restart your terminal and run: wordsail init${NC}"
     echo ""
 }
 

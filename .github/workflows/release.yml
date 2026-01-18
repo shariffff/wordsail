@@ -51,13 +51,28 @@ jobs:
 
           go build -ldflags "-X github.com/wordsail/cli/cmd.Version=${{ steps.version.outputs.VERSION }} -X github.com/wordsail/cli/cmd.CommitSHA=${GITHUB_SHA::7} -X github.com/wordsail/cli/cmd.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o ${BINARY_NAME} .
 
-          # Create archive
+      - name: Create archive
+        run: |
           ARCHIVE_NAME="wordsail_${{ steps.version.outputs.VERSION }}_${{ matrix.os }}_${{ matrix.arch }}"
+          mkdir -p dist/${ARCHIVE_NAME}
+
+          # Copy binary
           if [ "${{ matrix.os }}" = "windows" ]; then
-            zip ${ARCHIVE_NAME}.zip ${BINARY_NAME}
+            cp cli/wordsail.exe dist/${ARCHIVE_NAME}/
+          else
+            cp cli/wordsail dist/${ARCHIVE_NAME}/
+          fi
+
+          # Copy ansible directory
+          cp -r ansible dist/${ARCHIVE_NAME}/
+
+          # Create archive
+          cd dist
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            zip -r ${ARCHIVE_NAME}.zip ${ARCHIVE_NAME}
             echo "ARCHIVE=${ARCHIVE_NAME}.zip" >> $GITHUB_ENV
           else
-            tar -czvf ${ARCHIVE_NAME}.tar.gz ${BINARY_NAME}
+            tar -czvf ${ARCHIVE_NAME}.tar.gz ${ARCHIVE_NAME}
             echo "ARCHIVE=${ARCHIVE_NAME}.tar.gz" >> $GITHUB_ENV
           fi
 
@@ -65,7 +80,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wordsail_${{ steps.version.outputs.VERSION }}_${{ matrix.os }}_${{ matrix.arch }}
-          path: cli/${{ env.ARCHIVE }}
+          path: dist/${{ env.ARCHIVE }}
 
   release:
     needs: build
