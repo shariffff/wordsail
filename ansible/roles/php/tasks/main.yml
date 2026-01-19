@@ -11,7 +11,7 @@
 
 - name: Install PHP {{ php_version }} and extensions
   ansible.builtin.apt:
-    name: "{{ ['php' + php_version + '-' + item for item in php_extensions] + ['libpcre2-8-0'] }}"
+    name: "{{ php_extensions | map('regex_replace', '^(.*)$', 'php' ~ php_version ~ '-\\1') | list + ['libpcre2-8-0'] }}"
     state: present
     update_cache: "{{ add_repository.changed }}"
   notify: restart php-fpm

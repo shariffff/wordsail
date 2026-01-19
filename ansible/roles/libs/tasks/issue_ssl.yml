@@ -101,8 +101,8 @@
 - name: Update Nginx listen directive to SSL for port 80
   ansible.builtin.lineinfile:
     path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
-    regexp: "^\\s*listen\\s+80;\\s+#\\s+Ansible managed"
-    line: "  listen 443 ssl; # Ansible managed"
+    regexp: "^\\s*listen\\s+80;"
+    line: "\tlisten 443 ssl; # Ansible managed"
     state: present
     backrefs: true
   tags: issue_ssl
@@ -110,17 +110,26 @@
 - name: Update Nginx listen directive to SSL for IPv6
   ansible.builtin.lineinfile:
     path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
-    regexp: "^\\s*listen\\s+\\[\\:\\:\\]:80;\\s+#\\s+Ansible managed"
-    line: "  listen [::]:443 ssl; # Ansible managed\n  http2 on; # Ansible managed"
+    regexp: "^\\s*listen\\s+\\[\\:\\:\\]:80;"
+    line: "\tlisten [::]:443 ssl; # Ansible managed"
     state: present
     backrefs: true
+  tags: issue_ssl
+
+- name: Add http2 directive for SSL
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
+    regexp: "^\\s*http2\\s+on;"
+    line: "\thttp2 on; # Ansible managed"
+    insertafter: "listen.*443 ssl"
+    state: present
   tags: issue_ssl
 
 - name: Add SSL certificate path to Nginx configuration
   ansible.builtin.lineinfile:
     path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
-    regexp: "^[^\\S\\r\\n]#?\\s*ssl_certificate\\s+"
-    line: "  ssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem; # Ansible managed"
+    regexp: "^\\s*#?\\s*ssl_certificate\\s+[^_]"
+    line: "\tssl_certificate /etc/letsencrypt/live/{{ domain }}/fullchain.pem; # Ansible managed"
     state: present
     backrefs: true
   tags: issue_ssl
@@ -128,10 +137,17 @@
 - name: Add SSL certificate key path to Nginx configuration
   ansible.builtin.lineinfile:
     path: /etc/nginx/sites-available/{{ domain }}/{{ domain }}
-    regexp: "^[^\\S\\r\\n]#?\\s*ssl_certificate_key\\s+"
-    line: "  ssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem; # Ansible managed"
+    regexp: "^\\s*#?\\s*ssl_certificate_key\\s+"
+    line: "\tssl_certificate_key /etc/letsencrypt/live/{{ domain }}/privkey.pem; # Ansible managed"
     state: present
     backrefs: true
+  tags: issue_ssl
+
+- name: Reload Nginx after SSL configuration
+  ansible.builtin.systemd:
+    name: nginx
+    state: reloaded
+    scope: system
   tags: issue_ssl
 
 - name: Add Strict-Transport-Security header

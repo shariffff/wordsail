@@ -150,6 +150,7 @@ var siteCreateCmd = &cobra.Command{
 		fmt.Println()
 		color.Cyan("═══════════════════════════════════════════════════════")
 		color.Cyan("  Creating WordPress site: %s", input.Domain)
+		color.Cyan("  Estimated time: 2-4 minutes")
 		color.Cyan("═══════════════════════════════════════════════════════")
 		fmt.Println()
 

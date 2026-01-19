@@ -38,6 +38,10 @@ func PromptInitSetup() (*InitInput, error) {
 		if err := survey.AskOne(keyPrompt, &input.SSHPublicKey, survey.WithValidator(survey.Required)); err != nil {
 			return nil, err
 		}
+	} else if len(sshPubKeys) == 1 {
+		// Auto-select when only one key is available
+		input.SSHPublicKey = sshPubKeys[0]
+		fmt.Printf("Using SSH public key: %s\n", sshPubKeys[0])
 	} else {
 		// Show picker with available keys
 		options := append(sshPubKeys, "Enter path manually")

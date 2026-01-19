@@ -49,8 +49,8 @@ func DefaultConfig() *Config {
 			PythonInterpreter: "/usr/bin/python3",
 		},
 		GlobalVars: map[string]interface{}{
-			"certbot_email":    "admin@example.com",
-			"wordsail_ssh_key": "~/.ssh/wordsail_rsa.pub",
+			"certbot_email":    "",
+			"wordsail_ssh_key": "",
 		},
 		Servers: []models.Server{},
 		Backup: BackupConfig{

@@ -561,6 +561,23 @@ Examples:
 			}
 		}
 
+		// Validate required global vars are present
+		requiredVars := []string{"certbot_email", "wordsail_ssh_key"}
+		for _, varName := range requiredVars {
+			val, exists := cfg.GlobalVars[varName]
+			if !exists || val == nil || fmt.Sprintf("%v", val) == "" {
+				color.Red("✗ Missing required configuration: %s", varName)
+				fmt.Println()
+				fmt.Println("Please ensure your configuration has the following global_vars set:")
+				fmt.Println("  - certbot_email: Email for Let's Encrypt certificates")
+				fmt.Println("  - wordsail_ssh_key: Path to SSH public key for wordsail user")
+				fmt.Println()
+				fmt.Println("Run 'wordsail init --force' to reconfigure, or edit your config:")
+				fmt.Printf("  %s %s\n", getEditor(), mgr.GetConfigPath())
+				os.Exit(1)
+			}
+		}
+
 		// Create a copy of global vars and add the server-specific MySQL password
 		provisionVars := make(map[string]interface{})
 		for k, v := range cfg.GlobalVars {
@@ -577,6 +594,7 @@ Examples:
 		fmt.Println()
 		color.Cyan("═══════════════════════════════════════════════════════")
 		color.Cyan("  Starting provisioning: %s", serverName)
+		color.Cyan("  Estimated time: 5-10 minutes")
 		color.Cyan("═══════════════════════════════════════════════════════")
 		fmt.Println()
 

@@ -61,6 +61,10 @@ func PromptServerAdd() (*ServerInput, error) {
 		if err := survey.AskOne(keyPrompt, &input.SSHKey, survey.WithValidator(survey.Required)); err != nil {
 			return nil, err
 		}
+	} else if len(sshKeys) == 1 {
+		// Auto-select when only one key is available
+		input.SSHKey = sshKeys[0]
+		fmt.Printf("Using SSH key: %s\n", sshKeys[0])
 	} else {
 		// Show picker with available keys
 		keyPrompt := &survey.Select{

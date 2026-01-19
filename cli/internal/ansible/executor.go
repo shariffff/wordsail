@@ -119,9 +119,19 @@ func (e *Executor) ExecutePlaybook(playbookName string, server models.Server, ex
 		args = append(args, "--check")
 	}
 
-	// Add extra vars if provided
-	if len(extraVars) > 0 {
-		varsJSON, err := json.Marshal(extraVars)
+	// Merge globalVars and extraVars for --extra-vars (highest precedence)
+	// This ensures CLI-provided values override group_vars/all.yml
+	allVars := make(map[string]interface{})
+	for k, v := range globalVars {
+		allVars[k] = v
+	}
+	for k, v := range extraVars {
+		allVars[k] = v
+	}
+
+	// Add extra vars if any exist
+	if len(allVars) > 0 {
+		varsJSON, err := json.Marshal(allVars)
 		if err != nil {
 			return fmt.Errorf("failed to marshal extra vars: %w", err)
 		}
@@ -201,7 +211,7 @@ func (e *Executor) executeWithSpinner(cmd *exec.Cmd, stdout, stderr io.ReadClose
 	taskPattern := regexp.MustCompile(`^TASK \[(.+?)\]`)
 	playPattern := regexp.MustCompile(`^PLAY \[(.+?)\]`)
 	recapPattern := regexp.MustCompile(`ok=(\d+)\s+changed=(\d+).*failed=(\d+)`)
-	failedPattern := regexp.MustCompile(`(?i)(FAILED|fatal:)`)
+	failedPattern := regexp.MustCompile(`(FAILED!|fatal:)`)
 
 	done := make(chan bool, 2)
 
@@ -362,9 +372,19 @@ func (e *Executor) ExecutePlaybookWithResult(playbookName string, server models.
 		args = append(args, "--check")
 	}
 
-	// Add extra vars if provided
-	if len(extraVars) > 0 {
-		varsJSON, err := json.Marshal(extraVars)
+	// Merge globalVars and extraVars for --extra-vars (highest precedence)
+	// This ensures CLI-provided values override group_vars/all.yml
+	allVars := make(map[string]interface{})
+	for k, v := range globalVars {
+		allVars[k] = v
+	}
+	for k, v := range extraVars {
+		allVars[k] = v
+	}
+
+	// Add extra vars if any exist
+	if len(allVars) > 0 {
+		varsJSON, err := json.Marshal(allVars)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal extra vars: %w", err)
 		}
@@ -415,7 +435,7 @@ func (e *Executor) executeWithSpinnerAndResult(cmd *exec.Cmd, stdout, stderr io.
 	taskPattern := regexp.MustCompile(`^TASK \[(.+?)\]`)
 	playPattern := regexp.MustCompile(`^PLAY \[(.+?)\]`)
 	recapPattern := regexp.MustCompile(`ok=(\d+)\s+changed=(\d+).*failed=(\d+)`)
-	failedPattern := regexp.MustCompile(`(?i)(FAILED|fatal:)`)
+	failedPattern := regexp.MustCompile(`(FAILED!|fatal:)`)
 
 	done := make(chan bool, 2)
 

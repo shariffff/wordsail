@@ -23,6 +23,10 @@
     - { src: "wordsail-pool.conf.j2", dest: "{{ site_home }}/.wordsail-pool.conf" }
   notify: Reload php-fpm
 
+# Flush handlers to ensure PHP-FPM picks up the new pool before nginx starts using it
+- name: Flush handlers to reload PHP-FPM
+  ansible.builtin.meta: flush_handlers
+
 - name: Set ACL for PHP-FPM pool config
   ansible.posix.acl:
     path: "/etc/php/{{ php_version }}/fpm/pool.d/{{ site_id }}.conf"
